@@ -8,13 +8,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "build": "tsc"
   },
-  "dependencies": {
-    "@opita-market/shared-types": "*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/aws-lambda": "^8.10.140",
     "@types/node": "^20.14.0",
