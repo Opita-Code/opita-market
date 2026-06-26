@@ -1,0 +1,53 @@
+name: CI (Typecheck + Lint + Test)
+
+on:
+  push:
+    branches: [main, feature/**, feat/**]
+  pull_request:
+    branches: [main, feature/**]
+
+# Cancel in-flight runs for the same PR when a new commit lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Typecheck, Lint & Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Workspace typecheck
+        run: npm run typecheck
+
+      - name: Workspace lint
+        run: npm run lint
+        continue-on-error: false
+
+      - name: Workspace unit tests
+        run: npm test
+        continue-on-error: false
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opita-market-ci-${{ github.run_id }}
+          path: |
+            coverage/
+            **/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
