@@ -75,10 +75,10 @@ test.describe("Legal pages (Ley 1581/2012) — task 4.5", () => {
     }
   });
 
-  test("/admin/dpo returns 403 without DPO JWT", async ({ request }) => {
-    // No cookie set — middleware must short-circuit with 403.
+  test("/admin/dpo returns 401 without any JWT", async ({ request }) => {
+    // No cookie set — middleware must short-circuit with 401 (AUTH_REQUIRED).
     const res = await request.get("/admin/dpo", { maxRedirects: 0 });
-    expect(res.status()).toBe(403);
+    expect(res.status()).toBe(401);
   });
 
   test("/admin/dpo returns 403 with non-DPO JWT", async ({ request }) => {

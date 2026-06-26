@@ -1,20 +1,18 @@
 ---
-import { getCollection, type CollectionEntry } from "astro:content";
+import { getEntry, type CollectionEntry } from "astro:content";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 
-export async function getStaticPaths() {
-  const entries = await getCollection("legal");
-  return entries.map((entry) => ({
-    params: { slug: entry.slug },
-    props: { entry },
-  }));
+/**
+ * Server-mode dynamic route. `getStaticPaths` is for static builds only;
+ * since `astro.config.mjs` sets `output: "server"`, we resolve the entry
+ * directly from `Astro.params.slug` at request time. If the slug is
+ * unknown, we 404 — same behaviour the static version had implicitly.
+ */
+const slug = Astro.params.slug ?? "";
+const entry = (await getEntry("legal", slug)) as CollectionEntry<"legal"> | undefined;
+if (!entry) {
+  return new Response("Not found", { status: 404 });
 }
-
-interface Props {
-  entry: CollectionEntry<"legal">;
-}
-
-const { entry } = Astro.props as Props;
 const { Content } = await entry.render();
 const formattedDate = entry.data.effective_date.toLocaleDateString("es-CO", {
   year: "numeric",
