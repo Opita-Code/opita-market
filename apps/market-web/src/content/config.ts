@@ -17,7 +17,6 @@ const legal = defineCollection({
   type: "content",
   schema: z.object({
     title: z.string().min(5).max(200),
-    slug: z.string().regex(/^[a-z0-9-]+$/, "slug must be kebab-case"),
     effective_date: z.date(),
     version: z.string().regex(/^\d+\.\d+\.\d+$/, "version must be semver (X.Y.Z)"),
     requires_dpo_approval: z.literal(true),

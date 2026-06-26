@@ -1,6 +1,5 @@
 ---
 title: "Aviso de Privacidad"
-slug: "aviso"
 effective_date: 2026-06-26
 version: "1.0.0"
 requires_dpo_approval: true

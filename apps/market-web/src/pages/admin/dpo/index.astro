@@ -16,14 +16,14 @@
  * When the Compliance API is unreachable, we render a graceful fallback so
  * the DPO can still see the RNBD window + skeleton placeholders.
  */
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import AuditLogTable from "../../components/dpo/AuditLogTable";
-import ComplaintQueue from "../../components/dpo/ComplaintQueue";
-import RnbdWindowAlert from "../../components/dpo/RnbdWindowAlert";
-import SlaMetricsChart from "../../components/dpo/SlaMetricsChart";
-import { computeRnbdWindow } from "../../components/dpo/rnbd-window";
-import type { AuditEntry, ComplaintEntry, SlaMetric } from "../../components/dpo/types";
-import { authUrls } from "../../lib/cognito-sso-consumer";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import AuditLogTable from "../../../components/dpo/AuditLogTable";
+import ComplaintQueue from "../../../components/dpo/ComplaintQueue";
+import RnbdWindowAlert from "../../../components/dpo/RnbdWindowAlert";
+import SlaMetricsChart from "../../../components/dpo/SlaMetricsChart";
+import { computeRnbdWindow } from "../../../components/dpo/rnbd-window";
+import type { AuditEntry, ComplaintEntry, SlaMetric } from "../../../components/dpo/types";
+import { authUrls } from "../../../lib/cognito-sso-consumer";
 
 const user = Astro.locals.user;
 const apiBase = import.meta.env.PUBLIC_API_URL ?? process.env.PUBLIC_API_URL ?? "";

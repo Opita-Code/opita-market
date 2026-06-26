@@ -5,7 +5,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 export async function getStaticPaths() {
   const entries = await getCollection("legal");
   return entries.map((entry) => ({
-    params: { slug: entry.data.slug },
+    params: { slug: entry.slug },
     props: { entry },
   }));
 }
