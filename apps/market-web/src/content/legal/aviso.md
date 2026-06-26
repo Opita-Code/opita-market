@@ -3,15 +3,15 @@ title: "Aviso de Privacidad"
 effective_date: 2026-06-26
 version: "1.0.0"
 requires_dpo_approval: true
-summary: "Aviso de Privacidad resumido de Opita Market S.A.S. conforme al artículo 14 del Decreto 1377/2013."
-contact_email: "dpo@opitamarket.com.co"
+summary: "Aviso de Privacidad resumido de {{RAZON_SOCIAL}} conforme al artículo 14 del Decreto 1377/2013."
+contact_email: "{{EMAIL_PUBLICO}}"
 ---
 
 # Aviso de Privacidad
 
 > **Versión 1.0.0 — vigente desde el 26 de junio de 2026**
 
-Este es el Aviso de Privacidad resumido de **Opita Market S.A.S.**,
+Este es el Aviso de Privacidad resumido de **{{RAZON_SOCIAL}}**,
 publicado en cumplimiento del **artículo 14 del Decreto 1377 de 2013**
 que reglamenta la Ley 1581 de 2012. El texto completo y detallado se
 encuentra en nuestra [Política de Tratamiento de Datos (PTD)](/legal/ptd).
@@ -20,16 +20,16 @@ encuentra en nuestra [Política de Tratamiento de Datos (PTD)](/legal/ptd).
 
 | Campo | Valor |
 |-------|-------|
-| Razón social | Opita Market S.A.S. |
-| NIT | 900.XXX.XXX-X *(TBD)* |
-| Domicilio | Neiva, Huila, Colombia |
-| Representante legal | Juan Nicolás Urrutia Salcedo |
-| Correo del DPO | dpo@opitamarket.com.co |
+| Razón social | {{RAZON_SOCIAL}} |
+| NIT | {{NIT}} |
+| Domicilio | {{DIRECCION}} |
+| Representante legal | {{REP_LEGAL}} |
+| Correo de contacto (público) | {{EMAIL_PUBLICO}} |
 
 ## 2. Finalidades principales
 
-Opita Market trata datos personales para las siguientes finalidades
-principales:
+{{RAZON_SOCIAL}} trata datos personales para las siguientes
+finalidades principales:
 
 - **Publicar fichas comerciales** de establecimientos verificables
   (razón social, NIT, dirección, horarios, categoría, fotos).
@@ -74,17 +74,21 @@ ejercer derechos y demás aspectos del tratamiento, consulte nuestra:
 
 **[Política de Tratamiento de Datos Personales (PTD)](/legal/ptd)**
 
-## 5. Contacto del DPO y canal para derechos
+## 5. Contacto y canal para derechos del titular
 
 Para ejercer cualquiera de sus derechos como titular de los datos
 (conocer, actualizar, rectificar, suprimir o revocar la autorización),
-póngase en contacto con nuestro Oficial de Protección de Datos:
+póngase en contacto con nosotros a través del canal público:
 
-- **Correo electrónico**: dpo@opitamarket.com.co
+- **Correo electrónico**: {{EMAIL_PUBLICO}}
 - **Asunto sugerido**: "Solicitud Habeas Data — [tipo de derecho]"
 - **SLA de respuesta**: 15 días hábiles
 - **Autoridad de supervisión**: Superintendencia de Industria y
   Comercio (SIC) — [www.sic.gov.co](https://www.sic.gov.co)
+
+> El contacto privado del DPO se entrega únicamente bajo solicitud
+> dirigida a {{EMAIL_PUBLICO}}; no se publica en este aviso para evitar
+> captura automatizada (spam, scraping).
 
 Si considera que sus derechos no fueron atendidos adecuadamente, puede
 interponer una queja ante la SIC conforme al artículo 16 de la Ley
@@ -92,7 +96,7 @@ interponer una queja ante la SIC conforme al artículo 16 de la Ley
 
 ---
 
-> Opita Market S.A.S. se compromete a tratar sus datos personales con
+> {{RAZON_SOCIAL}} se compromete a tratar sus datos personales con
 > estricta sujeción a la Constitución, la Ley 1581/2012 y demás
 > normatividad aplicable. Esta política y aviso se revisan anualmente
 > y se actualizan conforme a los cambios normativos.

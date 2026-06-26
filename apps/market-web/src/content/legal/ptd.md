@@ -3,15 +3,15 @@ title: "Política de Tratamiento de Datos Personales (PTD)"
 effective_date: 2026-06-26
 version: "1.0.0"
 requires_dpo_approval: true
-summary: "Política de Tratamiento de Datos Personales de Opita Market S.A.S., en cumplimiento de la Ley 1581/2012, el Decreto 1377/2013 y la Circular Única de la SIC."
-contact_email: "dpo@opitamarket.com.co"
+summary: "Política de Tratamiento de Datos Personales de {{RAZON_SOCIAL}}, en cumplimiento de la Ley 1581/2012, el Decreto 1377/2013 y la Circular Única de la SIC."
+contact_email: "{{EMAIL_PUBLICO}}"
 ---
 
 # Política de Tratamiento de Datos Personales
 
 > **Versión 1.0.0 — vigente desde el 26 de junio de 2026**
 >
-> Documento preparado por Opita Market S.A.S. en cumplimiento de la
+> Documento preparado por {{RAZON_SOCIAL}} en cumplimiento de la
 > **Ley 1581 de 2012**, el **Decreto 1377 de 2013** y la **Circular Única
 > de la Superintendencia de Industria y Comercio (SIC)** — Título V
 > Habeas Data. Esta política aplica a todos los tratamientos de datos
@@ -21,17 +21,17 @@ contact_email: "dpo@opitamarket.com.co"
 
 | Campo | Valor |
 |-------|-------|
-| Razón social | Opita Market S.A.S. *(placeholder — confirmar antes de publicación)* |
-| NIT | 900.XXX.XXX-X *(TBD)* |
-| Dirección | Neiva, Huila, Colombia *(TBD — confirmar dirección registrada en Cámara de Comercio)* |
-| Correo electrónico | dpo@opitamarket.com.co |
-| Teléfono | +57 (8) 8XX-XXXX *(TBD)* |
-| Representante legal | Juan Nicolás Urrutia Salcedo |
-| Oficial de Protección de Datos (DPO) | *(TBD — contratista virtual / part-time)* |
+| Razón social | {{RAZON_SOCIAL}} |
+| NIT | {{NIT}} |
+| Dirección | {{DIRECCION}} |
+| Correo electrónico | {{EMAIL_PUBLICO}} |
+| Teléfono | *(Pendiente de constitución — sin línea asignada aún)* |
+| Representante legal | {{REP_LEGAL}} |
+| Oficial de Protección de Datos (DPO) | contacto privado disponible bajo solicitud a {{EMAIL_PUBLICO}} |
 
 El responsable del tratamiento es la persona jurídica que decide sobre
 la base de datos y/o el tratamiento de los datos personales. En este
-caso, **Opita Market S.A.S.** actúa como responsable del tratamiento de
+caso, **{{RAZON_SOCIAL}}** actúa como responsable del tratamiento de
 las bases de datos descritas en la sección 6.
 
 ## 2. Marco legal aplicable
@@ -82,7 +82,7 @@ definiciones, conforme al artículo 3 de la Ley 1581/2012:
 
 ## 4. Principios rectores
 
-Opita Market S.A.S. aplicará los siguientes principios en todo
+{{RAZON_SOCIAL}} aplicará los siguientes principios en todo
 tratamiento de datos personales, conforme al artículo 4 de la Ley
 1581/2012:
 
@@ -109,7 +109,7 @@ tratamiento de datos personales, conforme al artículo 4 de la Ley
 
 ## 5. Finalidades del tratamiento
 
-Los datos personales recolectados por Opita Market S.A.S. serán
+Los datos personales recolectados por {{RAZON_SOCIAL}} serán
 tratados para las siguientes finalidades específicas y delimitadas:
 
 ### 5.1 Finalidades para datos del establecimiento (público-comercial)
@@ -139,7 +139,7 @@ tratados para las siguientes finalidades específicas y delimitadas:
   (sin identificar al titular).
 - Prevenir fraude y garantizar la seguridad de la plataforma.
 
-**Opita Market S.A.S. NO utiliza los datos personales para:**
+**{{RAZON_SOCIAL}} NO utiliza los datos personales para:**
 - Venta o cesión a terceros con fines comerciales.
 - Elaboración de perfiles con fines discriminatorios.
 - Transferencias internacionales sin autorización expresa del titular.
@@ -182,7 +182,7 @@ titular firma un token de consentimiento explícito:
 
 ### 6.3 Datos sensibles
 
-Opita Market S.A.S. **NO recolecta datos sensibles** (origen racial,
+{{RAZON_SOCIAL}} **NO recolecta datos sensibles** (origen racial,
 orientación política, datos de salud, datos biométricos, etc.). En caso
 de requerirse en el futuro, se solicitará autorización expresa y se
 documentará la finalidad específica.
@@ -193,11 +193,11 @@ Conforme al artículo 8 de la Ley 1581/2012, el titular de los datos
 personales tiene los siguientes derechos:
 
 1. **Conocer**, actualizar y rectificar sus datos personales frente a
-   Opita Market S.A.S. Este derecho se ejerce mediante los canales
+   {{RAZON_SOCIAL}}. Este derecho se ejerce mediante los canales
    descritos en la sección 8.
-2. **Solicitar prueba de la autorización** otorgada a Opita Market
-   S.A.S., salvo cuando expresamente se exceptúe como en los casos
-   previstos por el artículo 10 de la Ley 1581/2012.
+2. **Solicitar prueba de la autorización** otorgada a {{RAZON_SOCIAL}},
+   salvo cuando expresamente se exceptúe como en los casos previstos
+   por el artículo 10 de la Ley 1581/2012.
 3. **Ser informado**, previa solicitud, respecto del uso dado a sus
    datos personales.
 4. **Presentar quejas** ante la Superintendencia de Industria y
@@ -217,7 +217,7 @@ personales tiene los siguientes derechos:
 
 Todas las solicitudes de derechos del titular deben dirigirse a:
 
-- **Correo electrónico**: dpo@opitamarket.com.co
+- **Correo electrónico**: {{EMAIL_PUBLICO}}
 - **Asunto sugerido**: "Solicitud Habeas Data — [Conocer | Actualizar |
   Rectificar | Suprimir]"
 
@@ -239,8 +239,8 @@ identidad no verificable.
 
 Conforme al artículo 14 de la Ley 1581/2012 y al Decreto 1377/2013, las
 solicitudes serán atendidas en un plazo máximo de **quince (15) días
-hábiles** contados a partir del día siguiente a la fecha de recibo de
-la solicitud completa y verificable. Este plazo podrá ser extendido una
+hábiles** contados a partir del día siguiente a la fecha de recibo de la
+solicitud completa y verificable. Este plazo podrá ser extendido una
 sola vez por ocho (8) días hábiles adicionales, previa notificación al
 titular.
 
@@ -254,7 +254,7 @@ Se recomienda usar el formato publicado en
 
 ## 9. Medidas de seguridad
 
-Opita Market S.A.S. aplica las siguientes medidas de seguridad para
+{{RAZON_SOCIAL}} aplica las siguientes medidas de seguridad para
 proteger los datos personales contra acceso no autorizado, pérdida,
 adulteración o uso indebido:
 
@@ -288,7 +288,7 @@ adulteración o uso indebido:
 
 La presente Política de Tratamiento de Datos Personales entra en
 vigencia a partir del **26 de junio de 2026** y permanecerá vigente
-mientras Opita Market S.A.S. opere el marketplace
+mientras {{RAZON_SOCIAL}} opere el marketplace
 `market.opitacode.com`, salvo modificación posterior conforme a esta
 sección.
 
@@ -315,9 +315,9 @@ Cualquier modificación sustancial será:
 
 ## Contacto del DPO
 
-- **Correo**: dpo@opitamarket.com.co
+- **Correo**: {{EMAIL_PUBLICO}}
 - **SLA**: 15 días hábiles
-- **Región**: Neiva, Huila, Colombia
+- **Región**: {{DIRECCION}}
 - **Autoridad de supervisión**: Superintendencia de Industria y
   Comercio (SIC) — www.sic.gov.co
 
