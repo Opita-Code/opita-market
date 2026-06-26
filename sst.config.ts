@@ -45,15 +45,75 @@ export default $config({
       // for the immutable RNBD receipt artifact per design.md §"S3 cold archive".
     });
 
-    // 3. NIT+DV verifier response cache bucket (DynamoDB is the runtime cache;
-    //    S3 mirrors for DPO review). Wired in PR 2.
+    // 3. NIT+DV verifier response cache table (DynamoDB).
+    //    24h TTL attribute drives auto-cleanup; manual negative caching
+    //    lives in src/api/nit-dv.ts. S3 mirror (NitDvArchive below) is
+    //    wired for DPO review (longer retention).
+    const nitDvCache = new sst.aws.Dynamo("NitDvCache", {
+      fields: { nit_dv: "string" },
+      primaryIndex: { hashKey: "nit_dv" },
+      ttl: "ttl_epoch",
+    });
+
+    // 4. NIT+DV verifier response S3 mirror (DPO review, longer retention).
     const nitDvArchiveBucket = new sst.aws.Bucket("NitDvArchive");
+
+    // 5. ComplianceAPI Lambda — Hono router mounted under api.opitacode.com.
+    //    `link: [db, nitDvCache]` grants IAM permissions automatically.
+    //    VERIFIK_API_KEY + JWT_SECRET are wired via SST Secret so they
+    //    never appear in the Lambda env directly (avoids accidental
+    //    console print in CloudWatch).
+    const verifikSecret = new sst.Secret("VerifikApiKey");
+    const jwtSecret = new sst.Secret("ComplianceJwtSecret");
+
+    const complianceApi = new sst.aws.Function("ComplianceAPI", {
+      handler: "packages/compliance-service/src/api/index.handler",
+      link: [db, nitDvCache, auditArchiveBucket, verifikSecret, jwtSecret],
+      environment: {
+        // SST links the secrets above into process.env automatically
+        // (named after the Secret resource). These fallbacks document the
+        // expected names so devs can `sst dev` without IAM surprises.
+        NIT_DV_CACHE_TABLE: nitDvCache.name,
+        DPO_EMAILS: process.env.DPO_EMAILS ?? "",
+      },
+      timeout: "30 seconds",
+      memory: "512 MB",
+    });
+
+    // 6. Router — extend api.opitacode.com so /rights/* and /verify-nit/* route
+    //    to ComplianceAPI. The opita-market share is api.opitacode.com/market/*
+    //    per Phase 0 v3, but for the compliance endpoints we expose them at
+    //    /market/rights/* via a path-prefix (matches the operator-decided
+    //    `market.opitacode.com` consumer-domain boundary).
+    const router = new sst.aws.Router("MarketRouter", {
+      domain: $app.stage === "prod" ? "api.opitacode.com" : "api-dev.opitacode.com",
+      routes: {
+        "/market/rights/*": complianceApi.url,
+        "/market/verify-nit/*": complianceApi.url,
+        "/market/audit": complianceApi.url,
+      },
+      transform: {
+        cachePolicy: {
+          parametersInCacheKeyAndForwardedToOrigin: {
+            cookiesConfig: { cookieBehavior: "none" },
+            headersConfig: {
+              headerBehavior: "whitelist",
+              headers: { items: ["Authorization", "Origin", "x-dpo-email"] },
+            },
+            queryStringsConfig: { queryStringBehavior: "all" },
+          },
+        },
+      },
+    });
 
     return {
       DatabaseName: db.clusterIdentifier,
       DatabaseSecretArn: db.secretArn,
       AuditArchiveBucketName: auditArchiveBucket.name,
       NitDvArchiveBucketName: nitDvArchiveBucket.name,
+      NitDvCacheTableName: nitDvCache.name,
+      ComplianceApiUrl: complianceApi.url,
+      MarketRouterUrl: router.url,
     };
   },
 });

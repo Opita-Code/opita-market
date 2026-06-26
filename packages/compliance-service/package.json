@@ -12,12 +12,18 @@
     "test:watch": "vitest",
     "build": "tsc"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1075.0",
+    "@aws-sdk/client-secrets-manager": "^3.1075.0",
+    "hono": "^4.12.27",
+    "pg": "^8.22.0"
+  },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.2.0",
     "@types/aws-lambda": "^8.10.140",
     "@types/node": "^20.14.0",
+    "@types/pg": "^8.20.0",
     "typescript": "^5.4.0",
-    "vitest": "^1.6.0",
-    "@electric-sql/pglite": "^0.2.0"
+    "vitest": "^1.6.0"
   }
 }
