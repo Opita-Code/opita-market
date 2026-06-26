@@ -23,8 +23,8 @@
  * never fire (EventBridge rejects the wildcard).
  */
 
-import { putCount } from "./cloudwatch-metrics.js";
-import { sendAlert } from "./ses-alerts.js";
+import { putCount } from "../cloudwatch-metrics.js";
+import { sendAlert } from "../ses-alerts.js";
 
 export interface RnbdWindowState {
   in_window: boolean;
