@@ -32,8 +32,9 @@ describe("sla-math (Ley 1581/2012 Art. 11 — 15 business days)", () => {
 
   it("counts business days across a weekend", () => {
     const days = businessDaysBetween("2026-01-02T00:00:00Z", "2026-01-12T00:00:00Z");
-    // 2026-01-02..2026-01-12 = 8 biz days (skip 3, 4 weekend)
-    expect(days).toBe(8);
+    // 2026-01-02 Fri (1), 01-05 Mon (2), 01-06 Tue (3), 01-07 Wed (4),
+    // 01-08 Thu (5), 01-09 Fri (6). 01-12 excluded (loop is half-open).
+    expect(days).toBe(6);
   });
 
   it("isSlaBreached is false when now < deadline", () => {

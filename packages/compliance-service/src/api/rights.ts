@@ -24,7 +24,6 @@ import {
   assertSqlScopedToSchema,
   withSchemaContext,
   type SchemaName,
-  AUDIT_SCOPE,
 } from "../lib/schema-isolation.js";
 import { computeSlaDeadline } from "../lib/sla-math.js";
 import {
@@ -309,7 +308,11 @@ export function makeRightsHandler(opts: RightsHandlerOptions) {
                     dpo_signoff, metadata, sla_deadline, sla_breached)
                  VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7::jsonb, $8, $9)
                  RETURNING id`;
-    assertSqlScopedToSchema(sql, AUDIT_SCOPE);
+    // public.audit_log is outside the two compliance schemas — it's a
+    // shared service table. We assert the SQL doesn't accidentally reach
+    // into representative_consented or public_commercial.
+    assertSqlScopedToSchema(sql, "representative_consented");
+    assertSqlScopedToSchema(sql, "public_commercial");
     const res = await opts.db.query<{ id: number }>(sql, [
       entry.occurred_at,
       entry.action,
@@ -342,6 +345,3 @@ export function makeRightsHandler(opts: RightsHandlerOptions) {
 export type RightsAction = "know" | "update" | "rectify" | "suppress";
 
 export const RIGHTS_ACTIONS: ReadonlyArray<RightsAction> = ["know", "update", "rectify", "suppress"];
-
-export const _audit = { AUDIT_OUTCOMES, AUDIT_ACTIONS };
-export type { AuditAction, AuditOutcome, SchemaName, NitDvLookupResult };

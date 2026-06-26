@@ -79,7 +79,7 @@ export async function signConsentToken(input: ConsentTokenInput, secret: string)
   if (!Array.isArray(input.scopes) || input.scopes.length === 0) {
     throw new ConsentTokenError("At least one scope is required", "MISSING_SCOPES");
   }
-  const ttl = Math.min(Math.max(input.ttlSeconds ?? 30 * 24 * 60 * 60, 60), MAX_TTL_SECONDS);
+  const ttl = Math.min(Math.max(input.ttlSeconds ?? 30 * 24 * 60 * 60, 1), MAX_TTL_SECONDS);
   const now = Math.floor(Date.now() / 1000);
   const claims: ConsentTokenClaims = {
     nit: input.nit,

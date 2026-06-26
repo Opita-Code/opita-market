@@ -35,6 +35,7 @@ export const AUDIT_ACTIONS = [
   "dpo.action",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+export { AUDIT_ACTIONS as AUDIT_ACTIONS_CONST };
 
 export const AUDIT_OUTCOMES = [
   "pending",
@@ -44,6 +45,7 @@ export const AUDIT_OUTCOMES = [
   "failed",
 ] as const;
 export type AuditOutcome = (typeof AUDIT_OUTCOMES)[number];
+export { AUDIT_OUTCOMES as AUDIT_OUTCOMES_CONST };
 
 export interface AuditEntryInput {
   action: AuditAction;

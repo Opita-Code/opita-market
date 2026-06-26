@@ -5,14 +5,14 @@
  */
 
 import { Pool, type PoolClient } from "pg";
-import type { DbExecutor } from "./audit.js";
+import type { DbExecutor } from "../api/audit.js";
 
 export function makePgExecutor(connectionString: string): DbExecutor & { close: () => Promise<void> } {
   const pool = new Pool({ connectionString, max: 5, idleTimeoutMillis: 30_000 });
   return {
-    async query<T>(sql: string, params?: ReadonlyArray<unknown>) {
-      const res = await pool.query<T>(sql, params as unknown[] | undefined);
-      return { rows: res.rows };
+    async query<T = unknown>(sql: string, params?: ReadonlyArray<unknown>) {
+      const res = await pool.query(sql, params as unknown[] | undefined);
+      return { rows: res.rows as T[] };
     },
     async close() {
       await pool.end();

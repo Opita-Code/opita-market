@@ -24,11 +24,12 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.16",
+    "@types/aws-lambda": "^8.10.140",
     "@types/node": "^20.14.0",
     "eslint": "^9.0.0",
     "prettier": "^3.3.0",
     "sst": "^4.13.1",
-    "@types/aws-lambda": "^8.10.140",
     "typescript": "^5.4.0"
   }
 }

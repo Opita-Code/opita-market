@@ -68,8 +68,8 @@ export function createComplianceApp(deps: ComplianceApiDeps) {
 
   // GET /verify-nit/:nit/:dv
   app.get("/verify-nit/:nit/:dv", async (c: Context) => {
-    const nit = c.req.param("nit");
-    const dv = c.req.param("dv");
+    const nit = c.req.param("nit") ?? "";
+    const dv = c.req.param("dv") ?? "";
     try {
       const result = await verifier.verify(nit, dv);
       // Record the lookup in the audit log per spec (action = nit-dv.lookup).
