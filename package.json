@@ -28,6 +28,7 @@
     "eslint": "^9.0.0",
     "prettier": "^3.3.0",
     "sst": "^3.5.0",
+    "@types/aws-lambda": "^8.10.140",
     "typescript": "^5.4.0"
   }
 }
