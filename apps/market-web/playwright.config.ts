@@ -52,6 +52,19 @@ export default defineConfig({
       JWT_SECRET: DEV_JWT_SECRET,
       // Silence noisy Astro logs unless the operator explicitly opts in.
       ASTRO_LOG_LEVEL: process.env.E2E_ASTRO_LOG_LEVEL ?? "silent",
+      // PR 4.5 (secrets-refactor): PTD legal-page SST Secret fixtures.
+      // These are TEST values injected into `astro dev` so the
+      // remark plugin + [slug].astro substitute() read non-empty
+      // strings at runtime. Real production values come from SST
+      // Secrets via `scripts/setup-secrets.sh` + `sst deploy`. Do NOT
+      // replace these with the real operator-supplied values: the
+      // tests must not depend on (or leak) production PII.
+      PTD_RAZON_SOCIAL: "Opita Code (E2E test value)",
+      PTD_NIT: "TEST-NIT-DO-NOT-USE-IN-PROD",
+      PTD_DIRECCION: "Neiva, Huila, Colombia (E2E test value)",
+      PTD_REP_LEGAL: "Representante Legal (E2E test value)",
+      PTD_EMAIL_PUBLICO: "e2e-public@example.com",
+      PTD_DPO_EMAIL: "e2e-dpo@example.com",
     },
     stdout: "pipe",
     stderr: "pipe",
