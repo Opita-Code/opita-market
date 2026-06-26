@@ -106,6 +106,29 @@ export default $config({
       },
     });
 
+    // 7. MarketWeb — public Astro 5 SSR storefront deployed to
+    //    market.opitacode.com. Hosts PTD + Aviso pages and the DPO dashboard.
+    //    SSR is required because the dashboard reads Astro.locals.user and
+    //    fetches from the Compliance API on every request.
+    //
+    //    Per astro-frontend skill: uses `sst.aws.Astro` component with
+    //    `responseMode: "stream"` (configured in astro.config.mjs).
+    //
+    //    `link: [db, auditArchiveBucket]` grants IAM permissions to read
+    //    from the Aurora cluster and write cold-archive audit rows.
+    //
+    //    `environment.PUBLIC_API_URL` is consumed by the DPO dashboard to
+    //    fetch `/market/audit` etc. from the API router above.
+    const web = new sst.aws.Astro("MarketWeb", {
+      path: "apps/market-web/",
+      link: [db, auditArchiveBucket],
+      environment: {
+        PUBLIC_API_URL: router.url,
+        JWT_SECRET: jwtSecret.value,
+      },
+      domain: $app.stage === "prod" ? "market.opitacode.com" : "market-dev.opitacode.com",
+    });
+
     return {
       DatabaseName: db.clusterIdentifier,
       DatabaseSecretArn: db.secretArn,
@@ -114,6 +137,7 @@ export default $config({
       NitDvCacheTableName: nitDvCache.name,
       ComplianceApiUrl: complianceApi.url,
       MarketRouterUrl: router.url,
+      MarketWebUrl: web.url,
     };
   },
 });

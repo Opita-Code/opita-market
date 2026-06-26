@@ -9,7 +9,6 @@ import { defineMiddleware } from "astro:middleware";
  * DPO dashboard gating is enforced inside this file at `/admin/dpo/*`.
  */
 export const onRequest = defineMiddleware(async (context, next) => {
-  // Lazy import so the dev server doesn't crash if `jose` resolution fails on first boot.
   const { verifyJwt, requireGroup } = await import("./lib/cognito-sso-consumer");
 
   context.locals.requestId = crypto.randomUUID();
@@ -19,7 +18,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   const path = context.url.pathname;
   if (path.startsWith("/admin/dpo")) {
-    return requireGroup(context, "dpo");
+    const gate = await requireGroup(context, "dpo");
+    // requireGroup returns a passthrough Response (status 200) when allowed.
+    // Anything else (401 / 403) must short-circuit the pipeline.
+    if (gate.status !== 200) {
+      return gate;
+    }
   }
 
   return next();
