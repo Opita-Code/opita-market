@@ -74,7 +74,7 @@ ejercer derechos y demás aspectos del tratamiento, consulte nuestra:
 
 **[Política de Tratamiento de Datos Personales (PTD)](/legal/ptd)**
 
-## 5. Contacto y canal para derechos del titular
+## 5. Contacto del DPO y canal para derechos del titular
 
 Para ejercer cualquiera de sus derechos como titular de los datos
 (conocer, actualizar, rectificar, suprimir o revocar la autorización),
