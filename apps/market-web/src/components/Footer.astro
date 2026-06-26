@@ -3,8 +3,30 @@
  * Site-wide footer. Per Ley 1581/2012 + Decreto 1377/2013 + colombia-habeas-data skill:
  *   - PTD + Aviso de Privacidad links MUST be visible on every page (footer).
  *   - DPO contact section is required.
+ *
+ * PR 4.5 (secrets-refactor): all personal data shown in the footer
+ * (razón social, NIT, dirección, representante legal, email público)
+ * is read from SST Secrets at render time via
+ * `src/lib/legal-secrets.ts`. NEVER hardcode these values here —
+ * re-run `scripts/setup-secrets.sh` to rotate them.
  */
+import { substitute } from "../lib/legal-secrets";
+
 const year = new Date().getFullYear();
+
+// Pre-substitute every string that needs SST Secret values so the
+// template stays declarative.
+const razonSocial = substitute("{{RAZON_SOCIAL}}");
+const nit = substitute("{{NIT}}");
+const direccion = substitute("{{DIRECCION}}");
+const repLegal = substitute("{{REP_LEGAL}}");
+const emailPublico = substitute("{{EMAIL_PUBLICO}}");
+const copyrightLine = substitute(
+  "&copy; {{RAZON_SOCIAL}} — Todos los derechos reservados.",
+);
+const legalLine = substitute(
+  "NIT {{NIT}} · {{DIRECCION}} · Representante legal: {{REP_LEGAL}}",
+);
 ---
 
 <footer class="border-t border-slate-200 bg-slate-50 py-10 mt-12">
@@ -12,7 +34,7 @@ const year = new Date().getFullYear();
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
       <div>
         <h3 class="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-3">
-          Opita Market
+          {razonSocial}
         </h3>
         <p class="text-sm text-slate-600 leading-relaxed">
           Marketplace multi-vertical del Huila y Colombia. Conectamos
@@ -58,24 +80,23 @@ const year = new Date().getFullYear();
         <ul class="mt-2 space-y-1 text-sm">
           <li>
             <a
-              href="mailto:dpo@opitamarket.com.co"
+              href={`mailto:${emailPublico}`}
               class="text-sky-700 hover:text-sky-900 hover:underline"
             >
-              dpo@opitamarket.com.co
+              {emailPublico}
             </a>
           </li>
-          <li class="text-slate-600">Neiva, Huila, Colombia</li>
+          <li class="text-slate-600">{direccion}</li>
           <li class="text-slate-500 italic">SLA: 15 días hábiles</li>
         </ul>
       </div>
     </div>
 
-    <div class="mt-8 pt-6 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row justify-between gap-2">
-      <p>&copy; {year} Opita Market S.A.S. — Todos los derechos reservados.</p>
-      <p>
-        NIT 900.XXX.XXX-X · Neiva, Huila, Colombia · Representante legal:
-        Juan Nicolás Urrutia Salcedo
-      </p>
+    <div
+      class="mt-8 pt-6 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row justify-between gap-2"
+    >
+      <p set:html={copyrightLine.replace(/&copy;/g, `&copy; ${year}`)} />
+      <p>{legalLine}</p>
     </div>
   </div>
 </footer>
