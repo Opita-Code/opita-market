@@ -13,6 +13,22 @@
  * The dev JWT is signed with the same secret the dev server uses
  * (see e2e/fixtures/dev-jwt.ts + playwright.config.ts). Production uses
  * Cognito + jose — the same code path runs because we set JWT_SECRET.
+ *
+ * PR 4.5 (secrets-refactor) interaction:
+ *   - The section-header assertions below rely on the `## N. ...` H2
+ *     headings in PTD + Aviso, which are static markdown structure
+ *     unaffected by SST Secret substitution.
+ *   - The `{{TOKEN}}` substitution runs in `apps/market-web/src/lib/
+ *     remark-substitute-legal-placeholders.ts` + `legal-secrets.ts`,
+ *     wired in astro.config.mjs. Personal data (razón social, NIT,
+ *     dirección, representante legal, email público) is therefore
+ *     substituted at render time — never hardcoded in the .md files.
+ *   - Companion suite `e2e/legal-secrets.spec.ts` exercises the
+ *     substitution end-to-end (no `{{TOKEN}}` leakage, DPO email
+ *     stays private).
+ *   - playwright.config.ts injects clearly-marked E2E fixtures for
+ *     PTD_* env vars so these tests don't depend on real production
+ *     personal data.
  */
 
 import { expect, test } from "@playwright/test";
