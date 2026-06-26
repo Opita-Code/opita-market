@@ -1,0 +1,69 @@
+---
+import { getCollection, type CollectionEntry } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("legal");
+  return entries.map((entry) => ({
+    params: { slug: entry.data.slug },
+    props: { entry },
+  }));
+}
+
+interface Props {
+  entry: CollectionEntry<"legal">;
+}
+
+const { entry } = Astro.props as Props;
+const { Content } = await entry.render();
+const formattedDate = entry.data.effective_date.toLocaleDateString("es-CO", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+---
+
+<BaseLayout title={`${entry.data.title} — Opita Market`} description={entry.data.summary}>
+  <article class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <header class="mb-8 pb-6 border-b border-slate-200">
+      <p class="text-xs uppercase tracking-wider text-sky-700 font-semibold mb-2">
+        Documento legal · Versión {entry.data.version}
+      </p>
+      <h1 class="text-3xl font-bold text-slate-900 mb-2">
+        {entry.data.title}
+      </h1>
+      <p class="text-sm text-slate-500">
+        Vigente desde el <time datetime={entry.data.effective_date.toISOString()}>{formattedDate}</time>
+      </p>
+      {entry.data.summary && (
+        <p class="mt-4 text-base text-slate-600 italic">
+          {entry.data.summary}
+        </p>
+      )}
+    </header>
+
+    <div class="legal-prose">
+      <Content />
+    </div>
+
+    <aside class="mt-12 pt-6 border-t border-slate-200 bg-slate-50 rounded-lg p-6">
+      <h2 class="text-base font-semibold text-slate-900 mb-2">
+        ¿Necesita contactar al DPO?
+      </h2>
+      <p class="text-sm text-slate-600 mb-3">
+        Para ejercer sus derechos como titular (conocer, actualizar,
+        rectificar, suprimir) escriba a:
+      </p>
+      <a
+        href={`mailto:${entry.data.contact_email}`}
+        class="inline-block bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded hover:bg-sky-800"
+      >
+        {entry.data.contact_email}
+      </a>
+      <p class="mt-3 text-xs text-slate-500">
+        SLA de respuesta: 15 días hábiles. Autoridad de supervisión:
+        Superintendencia de Industria y Comercio (SIC).
+      </p>
+    </aside>
+  </article>
+</BaseLayout>
