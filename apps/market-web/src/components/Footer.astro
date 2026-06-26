@@ -1,0 +1,81 @@
+---
+/**
+ * Site-wide footer. Per Ley 1581/2012 + Decreto 1377/2013 + colombia-habeas-data skill:
+ *   - PTD + Aviso de Privacidad links MUST be visible on every page (footer).
+ *   - DPO contact section is required.
+ */
+const year = new Date().getFullYear();
+---
+
+<footer class="border-t border-slate-200 bg-slate-50 py-10 mt-12">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div>
+        <h3 class="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-3">
+          Opita Market
+        </h3>
+        <p class="text-sm text-slate-600 leading-relaxed">
+          Marketplace multi-vertical del Huila y Colombia. Conectamos
+          establecimentos con consumidores respetando la Ley 1581/2012 de
+          Habeas Data.
+        </p>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-3">
+          Tratamiento de datos
+        </h3>
+        <ul class="space-y-2 text-sm">
+          <li>
+            <a
+              href="/legal/ptd"
+              class="text-sky-700 hover:text-sky-900 hover:underline"
+              data-testid="footer-link-ptd"
+            >
+              Política de Tratamiento de Datos (PTD)
+            </a>
+          </li>
+          <li>
+            <a
+              href="/legal/aviso"
+              class="text-sky-700 hover:text-sky-900 hover:underline"
+              data-testid="footer-link-aviso"
+            >
+              Aviso de Privacidad
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-3">
+          Oficial de Protección de Datos (DPO)
+        </h3>
+        <p class="text-sm text-slate-600">
+          Para ejercer sus derechos como titular (conocer, actualizar,
+          rectificar, suprimir) contáctenos en:
+        </p>
+        <ul class="mt-2 space-y-1 text-sm">
+          <li>
+            <a
+              href="mailto:dpo@opitamarket.com.co"
+              class="text-sky-700 hover:text-sky-900 hover:underline"
+            >
+              dpo@opitamarket.com.co
+            </a>
+          </li>
+          <li class="text-slate-600">Neiva, Huila, Colombia</li>
+          <li class="text-slate-500 italic">SLA: 15 días hábiles</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-8 pt-6 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row justify-between gap-2">
+      <p>&copy; {year} Opita Market S.A.S. — Todos los derechos reservados.</p>
+      <p>
+        NIT 900.XXX.XXX-X · Neiva, Huila, Colombia · Representante legal:
+        Juan Nicolás Urrutia Salcedo
+      </p>
+    </div>
+  </div>
+</footer>
