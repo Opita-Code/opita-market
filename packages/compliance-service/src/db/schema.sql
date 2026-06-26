@@ -15,6 +15,12 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------
+-- 0. Extensions — must exist BEFORE any table that uses them.
+-- ---------------------------------------------------------------------
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";    -- gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS "citext";      -- case-insensitive email
+
+-- ---------------------------------------------------------------------
 -- 1. public_commercial — datos_publicos_establecimiento
 -- ---------------------------------------------------------------------
 -- Permissive data: razon_social, nit, direccion_registrada, etc.
@@ -216,13 +222,7 @@ END;
 $$;
 
 -- ---------------------------------------------------------------------
--- 5. Extensions
--- ---------------------------------------------------------------------
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";    -- gen_random_uuid()
-CREATE EXTENSION IF NOT EXISTS "citext";      -- case-insensitive email
-
--- ---------------------------------------------------------------------
--- 6. Schema isolation guard — application role privileges
+-- 5. Schema isolation guard — application role privileges
 -- ---------------------------------------------------------------------
 -- Production posture: the compliance-service app role has:
 --   - SELECT/INSERT/UPDATE on public_commercial.establecimientos
