@@ -1,0 +1,146 @@
+name: Legal Review Gate (Habeas Data)
+
+# Mandated by spec/data-protection-compliance:
+#   PTD and Aviso de Privacidad are versioned markdown owned by the
+#   contracted DPO + Colombian legal counsel. No change to legal text
+#   ships without both reviews. This workflow blocks the merge until
+#   the required reviewers have approved.
+
+on:
+  pull_request:
+    branches: [main, feature/**]
+    paths:
+      - 'apps/**/src/content/legal/**'
+      - 'apps/**/src/pages/legal/**'
+      - 'apps/**/src/components/legal/**'
+      - 'openspec/**'
+
+  # Allow ops to dispatch a manual review (e.g., for hotfix to legal
+  # text outside a PR — rare, but required for incident response).
+  workflow_dispatch:
+
+# Cancel stale runs on the same PR.
+concurrency:
+  group: legal-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  require-legal-approvals:
+    name: DPO + Legal Counsel approvals
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Detect changed legal files
+        id: changed
+        uses: tj-actions/changed-files@v45
+        with:
+          files_yaml: |
+            apps/**/src/content/legal/**
+            apps/**/src/pages/legal/**
+            apps/**/src/components/legal/**
+            openspec/**
+
+      - name: Compute required approvers
+        id: required
+        env:
+          REQUIRED_DPO: ${{ vars.REQUIRED_DPO || 'dpo' }}
+          REQUIRED_LEGAL: ${{ vars.REQUIRED_LEGAL || 'legal-counsel' }}
+        run: |
+          echo "dpo_team=$REQUIRED_DPO" >> "$GITHUB_OUTPUT"
+          echo "legal_team=$REQUIRED_LEGAL" >> "$GITHUB_OUTPUT"
+          echo "Required approvers: $REQUIRED_DPO + $REQUIRED_LEGAL"
+
+      - name: Verify required approvals
+        if: steps.changed.outputs.any_changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DPO_TEAM: ${{ steps.required.outputs.dpo_team }}
+          LEGAL_TEAM: ${{ steps.required.outputs.legal_team }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PR_NUMBER:-}" ]; then
+            echo "legal-review.yml: not in a PR context — skipping approval check."
+            exit 0
+          fi
+
+          echo "Fetching reviews for PR #${PR_NUMBER}..."
+
+          # Map team slug → GitHub team slug. Configure via repo vars
+          # REQUIRED_DPO / REQUIRED_LEGAL once teams exist.
+          # https://docs.github.com/en/rest/pulls/reviews#list-reviews-for-a-pull-request
+          REVIEWS_JSON=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate)
+
+          # Find at least one approval each from DPO team and Legal team.
+          # Reviewers' team membership is queried separately below.
+          DPO_APPROVERS=$(echo "$REVIEWS_JSON" \
+            | jq -r '.[] | select(.state == "APPROVED") | .user.login' \
+            | sort -u)
+
+          LEGAL_APPROVERS=$(echo "$REVIEWS_JSON" \
+            | jq -r '.[] | select(.state == "APPROVED") | .user.login' \
+            | sort -u)
+
+          if [ -z "$DPO_APPROVERS" ]; then
+            echo "::error::No approvals found yet on PR #${PR_NUMBER}."
+            exit 1
+          fi
+
+          dpo_ok=false
+          legal_ok=false
+
+          for approver in $DPO_APPROVERS; do
+            if gh api "orgs/${GITHUB_REPOSITORY_OWNER}/teams/${DPO_TEAM}/memberships/${approver}" \
+                 --silent >/dev/null 2>&1; then
+              echo "DPO approval OK: ${approver} is in team ${DPO_TEAM}"
+              dpo_ok=true
+              break
+            fi
+          done
+
+          for approver in $LEGAL_APPROVERS; do
+            if gh api "orgs/${GITHUB_REPOSITORY_OWNER}/teams/${LEGAL_TEAM}/memberships/${approver}" \
+                 --silent >/dev/null 2>&1; then
+              echo "Legal approval OK: ${approver} is in team ${LEGAL_TEAM}"
+              legal_ok=true
+              break
+            fi
+          done
+
+          if [ "$dpo_ok" != "true" ]; then
+            echo "::error::DPO approval missing. Required team: ${DPO_TEAM}."
+          fi
+          if [ "$legal_ok" != "true" ]; then
+            echo "::error::Legal counsel approval missing. Required team: ${LEGAL_TEAM}."
+          fi
+
+          if [ "$dpo_ok" != "true" ] || [ "$legal_ok" != "true" ]; then
+            echo ""
+            echo "Legal text changes require approval from BOTH:"
+            echo "  - ${DPO_TEAM} (Data Protection Officer)"
+            echo "  - ${LEGAL_TEAM} (Colombian legal counsel)"
+            echo "Set REQUIRED_DPO / REQUIRED_LEGAL repo vars to match your team slugs."
+            exit 1
+          fi
+
+          echo "Legal review gate passed for PR #${PR_NUMBER}."
+
+      - name: Skip notice
+        if: steps.changed.outputs.any_changed != 'true'
+        run: |
+          echo "No legal files changed in this PR. Legal review gate skipped."
+
+  # Stub for SPEC §"Audit Trail" — POST `/api/audit` writes the
+  # PR approval event to dark-mem engagement log. Wired in PR 3
+  # once the audit endpoint exists.
+  notify-dpo:
+    name: Notify DPO via dark-mem (post-merge)
+    needs: require-legal-approvals
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log approval event
+        run: |
+          echo "TODO PR 3: POST dark-mem engagement update with PR#${PR_NUMBER} merge of legal text."
