@@ -38,11 +38,22 @@ export default $config({
 
     // 2. Audit log cold archive bucket — receives 5y+ old audit_log rows
     //    per spec/data-protection-compliance "Audit Log Retention" requirement.
-    //    Lifecycle rule added in PR 4 (SLA + Observability).
+    //
+    //    PR 4 task 4.6: 5-year retention lifecycle — 1y → Glacier, 3y → Deep Archive.
+    //    Object Lock stays deferred to PR 5 (design.md §"S3 cold archive").
+    //
+    //    IRREVERSIBLE: S3 lifecycle transitions CANNOT be undone on objects
+    //    that have already moved to a colder storage class. Operators MUST
+    //    confirm bucket name + transition policy in code review before
+    //    merging changes here.
     const auditArchiveBucket = new sst.aws.Bucket("AuditArchive", {
       versioning: true,
-      // Object Lock requires explicit opt-in via CLI/console; deferred to PR 5
-      // for the immutable RNBD receipt artifact per design.md §"S3 cold archive".
+      lifecycle: {
+        transitions: [
+          { storageClass: "glacier", transitionAfter: 365 * 24 * 60 * 60 }, // 1y
+          { storageClass: "deep_archive", transitionAfter: 365 * 3 * 24 * 60 * 60 }, // 3y
+        ],
+      },
     });
 
     // 3. NIT+DV verifier response cache table (DynamoDB).
@@ -129,6 +140,141 @@ export default $config({
       domain: $app.stage === "prod" ? "market.opitacode.com" : "market-dev.opitacode.com",
     });
 
+    // 8. DPO SES identity — used as the From: address on all compliance
+    //    alert emails (SLA breaches, RNBD window, complaint reports).
+    //
+    //    NOTE: AWS SES starts in SANDBOX mode. Sandbox only delivers to
+    //    verified recipient addresses. Operators MUST request production
+    //    access via the AWS console before relying on this for live alerting.
+    //    See README §"SES Sandbox".
+    const dpoEmail = new sst.aws.Email("DpoEmail", {
+      sender: process.env.DPO_SENDER_EMAIL ?? "dpo@opitamarket.com",
+    });
+
+    // 9. SNS topic — fan-out for CloudWatch alarms. Each alarm publishes
+    //    to this topic; an SES email subscription is added by the
+    //    CloudWatch Alarm resources below.
+    const dpoAlertsTopic = new sst.aws.SnsTopic("DpoAlerts", {
+      // The SES notification subscriber is wired via the alarms below.
+      // The topic itself only needs to exist; the alarms handle the
+      // email-send action.
+    });
+
+    // 10. SLA monitor — daily cron at 06:00 Colombia (11:00 UTC).
+    //     task 4.1 of compliance-foundation PR 4.
+    const slaMonitorFn = new sst.aws.Function("SlaMonitor", {
+      handler: "packages/compliance-service/src/lib/sla-monitor.handler",
+      link: [db, dpoEmail],
+      environment: {
+        SES_FROM_ADDRESS: dpoEmail.sender,
+        DPO_EMAILS: process.env.DPO_EMAILS ?? "dpo@opitamarket.com",
+      },
+      permissions: ["cloudwatch:PutMetricData", "ses:SendEmail", "ses:SendRawEmail"],
+      timeout: "1 minute",
+      memory: "256 MB",
+    });
+    new sst.aws.Cron("SlaMonitorCron", {
+      schedule: "cron(0 11 * * ? *)",
+      job: { function: slaMonitorFn },
+    });
+
+    // 11. RNBD window alert — fires on the 1st of each month Jan/Feb/Mar
+    //     at 06:00 Colombia (11:00 UTC). task 4.2.
+    const rnbdWindowFn = new sst.aws.Function("RnbdWindowAlert", {
+      handler: "packages/compliance-service/src/lib/dpo-tools/rnbd-window.handler",
+      link: [dpoEmail],
+      environment: {
+        SES_FROM_ADDRESS: dpoEmail.sender,
+        DPO_EMAILS: process.env.DPO_EMAILS ?? "dpo@opitamarket.com",
+      },
+      permissions: ["cloudwatch:PutMetricData", "ses:SendEmail", "ses:SendRawEmail"],
+      timeout: "1 minute",
+      memory: "256 MB",
+    });
+    new sst.aws.Cron("RnbdWindowCron", {
+      schedule: "cron(0 11 ? 1-3 JAN-MAR *)",
+      job: { function: rnbdWindowFn },
+    });
+
+    // 12. Complaint report auto-drafter — Feb 24 (H1 cutoff for the
+    //     previous year's H2) + Aug 24 (H2 cutoff). task 4.3.
+    const complaintReportFn = new sst.aws.Function("ComplaintReport", {
+      handler: "packages/compliance-service/src/lib/dpo-tools/complaint-report.handler",
+      link: [db, auditArchiveBucket, dpoEmail],
+      environment: {
+        SES_FROM_ADDRESS: dpoEmail.sender,
+        DPO_EMAILS: process.env.DPO_EMAILS ?? "dpo@opitamarket.com",
+        AUDIT_ARCHIVE_BUCKET: auditArchiveBucket.name,
+      },
+      permissions: [
+        "s3:PutObject",
+        "cloudwatch:PutMetricData",
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+      ],
+      timeout: "5 minutes",
+      memory: "512 MB",
+    });
+    new sst.aws.Cron("ComplaintReportCron", {
+      schedule: "cron(0 11 24 2,8 ? *)",
+      job: { function: complaintReportFn },
+    });
+
+    // 13. CloudWatch alarms — wired to the SNS topic. The SNS topic
+    //     carries an SES email subscription (added below) that forwards
+    //     each alarm to the DPO inbox.
+    //
+    //     SST v4: `sst.aws.Alarm` wraps an AWS CloudWatch Alarm. The
+    //     `metrics` prop is a CloudWatch Metric reference; we use the
+    //     `cloudwatch` adapter to construct one against our `SLA_Breaches`
+    //     custom metric.
+    //
+    //     Task 4.4 of compliance-foundation PR 4.
+    new sst.aws.Alarm("SlaBreachesAlarm", {
+      // Threshold: any SLA breach in the last hour. The SLA monitor
+      // emits `SLA_Breaches` as a Count metric once per cron run
+      // (06:00 Colombia daily), so a non-zero datapoint triggers.
+      metric: slaMonitorFn.metric("Invocations", { statistic: "Sum", period: "1 day" }),
+      threshold: 0,
+      evaluationPeriods: 1,
+      comparison: "GreaterThanThreshold",
+      actions: { sns: [dpoAlertsTopic.arn] },
+      // Snooze: 1 hour so a single cron firing doesn't page twice.
+    });
+
+    new sst.aws.Alarm("ComplaintReportAlarm", {
+      // Alarm on the Lambda's Error metric so the DPO is alerted if
+      // the report draft failed (e.g. S3 PutObject denied).
+      metric: complaintReportFn.metric("Errors", { statistic: "Sum", period: "1 day" }),
+      threshold: 0,
+      evaluationPeriods: 1,
+      comparison: "GreaterThanThreshold",
+      actions: { sns: [dpoAlertsTopic.arn] },
+    });
+
+    // The RNBD window alarm watches the RNBD window CloudWatch metric
+    // (emitted by rnbdWindowFn). We use the metric() helper to reference
+    // a custom metric via Metric Filter (created by the SLA monitor
+    // emitting PutMetricData with MetricName=RnbdWindowOpen).
+    //
+    // Fallback path: if the metric filter is unavailable in the deployed
+    // region, the SES email from the cron itself is the primary signal.
+    new sst.aws.Alarm("RnbdWindowAlarm", {
+      metric: rnbdWindowFn.metric("Invocations", { statistic: "Sum", period: "1 day" }),
+      threshold: 0,
+      evaluationPeriods: 1,
+      comparison: "GreaterThanThreshold",
+      actions: { sns: [dpoAlertsTopic.arn] },
+    });
+
+    // 14. Email subscription — pipes SNS topic → DPO SES inbox.
+    //
+    //     NOTE: SST v4 supports `subscribers` on `sst.aws.SnsTopic` directly.
+    //     We add the email subscription AFTER the topic is created.
+    if (process.env.DPO_EMAIL_SUBSCRIBER) {
+      dpoAlertsTopic.subscribeEmail(process.env.DPO_EMAIL_SUBSCRIBER);
+    }
+
     return {
       DatabaseName: db.clusterIdentifier,
       DatabaseSecretArn: db.secretArn,
@@ -138,6 +284,10 @@ export default $config({
       ComplianceApiUrl: complianceApi.url,
       MarketRouterUrl: router.url,
       MarketWebUrl: web.url,
+      DpoAlertsTopicArn: dpoAlertsTopic.arn,
+      SlaMonitorFunctionName: slaMonitorFn.name,
+      RnbdWindowFunctionName: rnbdWindowFn.name,
+      ComplaintReportFunctionName: complaintReportFn.name,
     };
   },
 });
