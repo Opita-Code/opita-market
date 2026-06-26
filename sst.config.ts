@@ -42,6 +42,13 @@ export default $config({
     //    PR 4 task 4.6: 5-year retention lifecycle — 1y → Glacier, 3y → Deep Archive.
     //    Object Lock stays deferred to PR 5 (design.md §"S3 cold archive").
     //
+    //    PR 5 task 5.3: extends retention to 7 years (2555 days) so the
+    //    bucket covers both the audit_log requirement (5y per Ley 1581)
+    //    AND the RNBD receipt requirement (7y per design.md §"S3 cold
+    //    archive" + go-live runbook). Final transitions: 1y → Glacier IR
+    //    (faster recall for DPO audits), 5y → Deep Archive (cheapest long
+    //    tail), 7y → retain until manual deletion.
+    //
     //    IRREVERSIBLE: S3 lifecycle transitions CANNOT be undone on objects
     //    that have already moved to a colder storage class. Operators MUST
     //    confirm bucket name + transition policy in code review before
@@ -50,9 +57,35 @@ export default $config({
       versioning: true,
       lifecycle: {
         transitions: [
-          { storageClass: "glacier", transitionAfter: 365 * 24 * 60 * 60 }, // 1y
-          { storageClass: "deep_archive", transitionAfter: 365 * 3 * 24 * 60 * 60 }, // 3y
+          { storageClass: "glacier_ir", transitionAfter: 365 * 24 * 60 * 60 }, // 1y
+          { storageClass: "deep_archive", transitionAfter: 365 * 5 * 24 * 60 * 60 }, // 5y
         ],
+      },
+    });
+
+    // 2b. RNBD receipts bucket — IMMUTABLE WORM store for the SIC-issued
+    //     PDF receipts that prove our RNBD registration. Object Lock in
+    //     COMPLIANCE mode means even the AWS root account CANNOT delete
+    //     or overwrite objects until the retention period elapses.
+    //
+    //     7-year retention (2555 days) covers: Ley 1581/2012 audit window
+    //     (5y) + Circular Única SIC inspection buffer (additional 2y for
+    //     re-certificaciones and RNBD anual updates). Matches the audit
+    //     log bucket lifetime so DPO can correlate complaints + receipts
+    //     from a single date range.
+    //
+    //     Object Lock requires S3 versioning (SST enables it above) and
+    //     must be set at bucket creation time — there is no "turn it on
+    //     later" migration. If you change `mode` or `retentionDays`,
+    //     SST will refuse to update the live bucket. Recreate the stack.
+    //
+    //     PR 5 task 5.3.
+    const rnbdReceiptsBucket = new sst.aws.Bucket("RnbdReceipts", {
+      versioning: true,
+      objectLock: {
+        enabled: true,
+        mode: "compliance", // Cannot be overwritten or deleted even by root
+        retentionDays: 2555, // 7 years
       },
     });
 
@@ -309,6 +342,7 @@ export default $config({
       DatabaseName: db.clusterIdentifier,
       DatabaseSecretArn: db.secretArn,
       AuditArchiveBucketName: auditArchiveBucket.name,
+      RnbdReceiptsBucketName: rnbdReceiptsBucket.name,
       NitDvArchiveBucketName: nitDvArchiveBucket.name,
       NitDvCacheTableName: nitDvCache.name,
       ComplianceApiUrl: complianceApi.url,
