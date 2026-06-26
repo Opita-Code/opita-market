@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+.yarn/
+
+# Build outputs
+dist/
+build/
+.next/
+.nuxt/
+.svelte-kit/
+.vite/
+.turbo/
+
+# SST
+.sst/
+.opencode/
+
+# Dark-mem local cache (not the project memory)
+.dark-mem-cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.staging
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Secrets (defense in depth — never commit secrets)
+*.pem
+*.key
+*.crt
+secrets/
+
+# OpenSpec artifacts in dev (keep openspec/ but ignore local working files)
+# openspec/ IS tracked — it's the source of truth for SDD

@@ -1,0 +1,96 @@
+project: opita-market
+mode: hybrid
+context: |
+  Opita Market is a greenfield multi-vertical Colombian marketplace — real-time price dashboard + directory + comparator for ALL economic sectors. B2B + B2C. AI-2026-first. Phase 0 closed (critical decisions made: domains, multi-tenancy, monetization, IA pillar). Phase 1 (sdd-init) starting. Reuses opita-account-ui for auth, mercado patterns from sociedad-opita-app. Primary domain: market.opitacode.com. Multi-tenancy: Hybrid (single global catalog + optional tenant per claim). Pilar IA: MiniMax Token Plan API cloud (no local models). OSINT carta blanca (no robots.txt, scraping agresivo).
+
+strict_tdd: false
+
+testing:
+  runner: not-configured-yet
+  framework: vitest-plus-playwright-planned
+  layers:
+    unit: pending
+    integration: pending
+    e2e: pending
+  coverage: pending
+  quality:
+    linter: eslint-planned
+    typechecker: typescript-planned
+    formatter: prettier-planned
+
+phases:
+  proposal:
+    enabled: true
+    location: openspec/changes/{change-name}/proposal.md
+    notes: |
+      Proposals name the WHAT and WHY. Must include Capabilities section that drives spec creation.
+      Reference prior observations: obs-bb4de5b73466 (Phase 0 v1), obs-b9004ba2acd2 (Phase 0 v2), obs-b07831dc74de (Phase 0 v3), obs-25b1aa0fa9e6 (OSINT).
+  spec:
+    enabled: true
+    location: openspec/changes/{change-name}/specs/{capability}/spec.md
+    notes: |
+      Delta specs per capability. Given/When/Then format. No implementation details.
+  design:
+    enabled: true
+    location: openspec/changes/{change-name}/design.md
+    notes: |
+      Architecture, file structure, decisions with rationale. Document ADRs for non-obvious choices.
+  tasks:
+    enabled: true
+    location: openspec/changes/{change-name}/tasks.md
+    notes: |
+      Task breakdown for apply. Each task specific enough to know when done.
+  apply:
+    enabled: true
+    notes: |
+      Apply tasks incrementally. Commit every 80-100 LOC. Return envelope early.
+  verify:
+    enabled: true
+    notes: |
+      Each spec scenario gets verdict: COMPLIANT / FAILING / UNTESTED.
+  archive:
+    enabled: true
+    notes: |
+      Merge delta specs into main specs. Move change folder to archive/.
+
+artifacts:
+  skill_registry: .atl/skill-registry.md
+  dark_mem_observations:
+    - topic: architecture/opita-market-phase0-v3, sync_id: obs-b07831dc74de
+    - topic: osint/opita-market-2026-06-25, sync_id: obs-25b1aa0fa9e6
+    - topic: architecture/opita-market-framing, sync_id: obs-bb4de5b73466
+    - topic: architecture/opita-market-phase0-v2, sync_id: obs-b9004ba2acd2
+
+decisions_log:
+  - decision: All-sectors day 1 (no vertical-first MVP)
+    rationale: Operator confirmed. Maximizes addressable market from launch.
+  - decision: Multi-tenancy = Hybrid (D)
+    rationale: Single global catalog + optional tenant per claim. Balances simplicity for 95% with flexibility for 5%.
+  - decision: B2B pays, B2C sees ads
+    rationale: Operator confirmed. B2B tier monetization model refined (Reclamado free / Visible $40-120K COP / Premium $200-600K COP / Enterprise custom).
+  - decision: Primary domain = market.opitacode.com
+    rationale: Aligns with org subdomain pattern (cuenta., vibe., sociedad., developer.). opitamarket.com → 301 redirect.
+  - decision: API = api.opitacode.com/market/*
+    rationale: Reuses existing SST Router already deployed by opita-vibe-studio + opita-account-ui.
+  - decision: Pilar IA = MiniMax Token Plan API cloud
+    rationale: Operator mandate. No local models. Token Plan Max ($50/mo) covers full multimodal (language + speech + video + image + music).
+  - decision: Auth = opita-account-ui
+    rationale: Reuses Cognito User Pool us-east-1_LItAcj2Aa. No rebuild.
+  - decision: Habeas Data (Ley 1581/2012) compliance required
+    rationale: Mandatory for Colombian personal data. Multas up to 2,000 SMLMV (~$700M COP).
+  - decision: OSINT carta blanca (no robots.txt, scraping agresivo)
+    rationale: Operator confirmed. Operationally feasible. Colombia legal context (Ley 1273/2009) permits scraping public pages.
+
+risks:
+  - risk: Habeas Data DPO not yet contracted
+    mitigation: Document as compliance requirement in Phase 2 (spec phase). Operator to engage legal counsel.
+  - risk: Pricing tiers in COP not market-validated
+    mitigation: Phase 1 (explore) includes pricing research with target user interviews (PyME Colombian owners).
+  - risk: opita-scout source code not yet reviewed
+    mitigation: Phase 1 task — read opita-scout source to identify reusable ingestion pipeline.
+  - risk: SST v3/v4 version drift in opita-account-ui
+    mitigation: Phase 1 task — verify SST version and harmonize with opita-vibe-studio (uses v4).
+  - risk: Habeas Data law change 2025 reform proposal (mandatory DPO)
+    mitigation: Track SIC updates. Default to hiring DPO from launch.
+
+next_step: sdd-explore
