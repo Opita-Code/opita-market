@@ -130,12 +130,42 @@ export default $config({
     //
     //    `environment.PUBLIC_API_URL` is consumed by the DPO dashboard to
     //    fetch `/market/audit` etc. from the API router above.
+    //
+    //    PR 4.5 (secrets-refactor): the 6 legal-page SST Secrets are
+    //    bound here as environment variables. They are referenced by
+    //    `apps/market-web/src/lib/legal-secrets.ts` via `process.env`
+    //    and substituted into PTD + Aviso markdown at render time. NEVER
+    //    hardcode these values in `.ts` / `.astro` / `.md` — operators
+    //    populate them once per stage via `scripts/setup-secrets.sh`.
+    //    See compliance-foundation PR 4.5 + openspec/changes/compliance-
+    //    foundation/tasks.md for the workflow.
+    const legalRazonSocial = new sst.Secret("RazonSocial");
+    const legalNit = new sst.Secret("Nit");
+    const legalDireccion = new sst.Secret("Direccion");
+    const legalRepLegal = new sst.Secret("RepLegal");
+    const legalEmailPublico = new sst.Secret("EmailPublico");
+    const legalDpoEmail = new sst.Secret("DpoEmail");
+
     const web = new sst.aws.Astro("MarketWeb", {
       path: "apps/market-web/",
       link: [db, auditArchiveBucket],
       environment: {
         PUBLIC_API_URL: router.url,
         JWT_SECRET: jwtSecret.value,
+        // PR 4.5: legal-page secrets. `sst.Secret(...).value` resolves
+        // to the resolved secret value at deploy time and injects it as
+        // a plain env var into the Astro component.
+        PTD_RAZON_SOCIAL: legalRazonSocial.value,
+        PTD_NIT: legalNit.value,
+        PTD_DIRECCION: legalDireccion.value,
+        PTD_REP_LEGAL: legalRepLegal.value,
+        PTD_EMAIL_PUBLICO: legalEmailPublico.value,
+        // DPO email is intentionally exposed only as an env var so the
+        // DPO dashboard code path can read it server-side. The remark
+        // plugin + [slug].astro substitute() only render {{DPO_EMAIL}}
+        // if the markdown ever asks for it — public PTD/Aviso pages do
+        // not (the public channel is {{EMAIL_PUBLICO}}).
+        PTD_DPO_EMAIL: legalDpoEmail.value,
       },
       domain: $app.stage === "prod" ? "market.opitacode.com" : "market-dev.opitacode.com",
     });
