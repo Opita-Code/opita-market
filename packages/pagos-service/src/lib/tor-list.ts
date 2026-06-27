@@ -51,7 +51,7 @@ class TorListClass {
   private loadedAt: Date | null = null;
 
   /** Replace the in-memory list with IPs parsed from text (one per line). */
-  loadFromText(text: string): void {
+  loadFromText(text: string, now: () => Date = () => new Date()): void {
     const newSet = new Set<string>();
     for (const line of text.split("\n")) {
       const trimmed = line.trim();
@@ -61,7 +61,7 @@ class TorListClass {
       newSet.add(trimmed.toLowerCase());
     }
     this.ips = newSet;
-    this.loadedAt = new Date();
+    this.loadedAt = now();
   }
 
   /** Reset to empty (for tests + cron re-runs). */
