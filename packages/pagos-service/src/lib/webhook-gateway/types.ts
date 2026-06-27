@@ -6,7 +6,9 @@ export type WompiEventType =
   | "transaction.approved"
   | "transaction.declined"
   | "transaction.reversed"
-  | "transaction.disputed";
+  | "transaction.disputed"
+  | "transaction.voided"
+  | "transaction.error";
 
 export type WompiTransactionStatus = "APPROVED" | "DECLINED" | "VOIDED" | "ERROR" | "REVERSED";
 
@@ -145,6 +147,8 @@ export const ESCROW_EVENT_MAP: Record<WompiEventType, string> = {
   "transaction.declined": "WOMPI_DECLINED",
   "transaction.reversed": "WOMPI_CHARGEBACK",
   "transaction.disputed": "BUYER_DISPUTE",
+  "transaction.voided": "WOMPI_VOIDED",
+  "transaction.error": "WOMPI_ERROR",
 };
 
 export const FRAUD_SIGNAL_3DS_NOT_VERIFIED = "3DS_NOT_VERIFIED";

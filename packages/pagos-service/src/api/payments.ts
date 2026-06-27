@@ -18,7 +18,25 @@ import { TierLimitExceededError, InvalidSignatureError, AmountInvalidError, Chan
 import { TIERS, requires3DS, isValidTier, type Tier } from "../lib/tiers.js";
 import { collectVelocitySignals } from "../lib/velocity/index.js";
 import { detectStructuring, isInBoundaryRange } from "../lib/structuring.js";
+import { webhookIpAllowlist, WebhookIpAllowlist, parseCidrs } from "../lib/webhook-ip-allowlist.js";
 import { getAppContext, type AppContext } from "./index.js";
+
+/**
+ * Wompi webhook IP allowlist (Closes OPL-API-012, LOW).
+ * In dev (no env var): no allowlist, but per-IP rate limit prevents the
+ * endpoint from being used as a generic DoS amplifier.
+ * In prod: set WOMPI_WEBHOOK_IPS to Wompi's published ranges and the
+ * allowlist matches strictly; rate limit becomes a no-op since the
+ * allowlist already restricts access.
+ */
+const WOMPI_WEBHOOK_ALLOWLIST = new WebhookIpAllowlist({
+  allowedCidrs: parseCidrs(
+    (globalThis as { process?: { env?: Record<string, string | undefined> } })
+      .process?.env?.WOMPI_WEBHOOK_IPS ?? "",
+  ),
+  rateLimitPerMinute: 60,
+});
+const webhookAllowlistMw = webhookIpAllowlist(WOMPI_WEBHOOK_ALLOWLIST);
 
 export const payments = new Hono();
 
@@ -152,7 +170,7 @@ payments.post("/intent", async (c) => {
 
 // ─── POST /v1/payments/webhook ──────────────────────────────────────────────
 
-payments.post("/webhook", async (c) => {
+payments.post("/webhook", webhookAllowlistMw, async (c) => {
   const ctx = getAppContext();
 
   // 1. Parse body (SyntaxError → 400 via global error handler)

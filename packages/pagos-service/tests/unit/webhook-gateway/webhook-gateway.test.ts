@@ -174,3 +174,36 @@ describe("webhook-gateway — R4: Event dispatch (closes OPL-CARD-002)", () => {
     );
   });
 });
+
+describe("webhook-gateway — R4: voided + error event disposition (closes OPL-API-015)", () => {
+  it("event.voided → marks tx as FAILED, no credit, no bonus reversal", async () => {
+    const deps = makeDeps();
+    const event = makeEvent({ event: "transaction.voided" });
+    const result = await processWompiWebhook(event, "valid-sig", deps);
+    expect(result.ok).toBe(true);
+    expect(deps.transactCredit).not.toHaveBeenCalled();
+    expect(deps.transactReverseBonus).not.toHaveBeenCalled();
+    expect(deps.transactTransition).toHaveBeenCalledWith(
+      expect.objectContaining({ fromState: "PENDING", toState: "FAILED" }),
+    );
+  });
+
+  it("event.error → marks tx as ERROR for DPO review / reconciliation cron", async () => {
+    const deps = makeDeps();
+    const event = makeEvent({ event: "transaction.error" });
+    const result = await processWompiWebhook(event, "valid-sig", deps);
+    expect(result.ok).toBe(true);
+    expect(deps.transactCredit).not.toHaveBeenCalled();
+    expect(deps.transactTransition).toHaveBeenCalledWith(
+      expect.objectContaining({ fromState: "PENDING", toState: "ERROR" }),
+    );
+  });
+
+  it("unknown event type → returns UNKNOWN_EVENT without crashing", async () => {
+    const deps = makeDeps();
+    const event = makeEvent({ event: "transaction.future_event" as never });
+    const result = await processWompiWebhook(event, "valid-sig", deps);
+    expect(result.ok).toBe(true);
+    expect(result.newState).toBe("UNKNOWN_EVENT");
+  });
+});

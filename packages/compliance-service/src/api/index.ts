@@ -19,6 +19,7 @@
  */
 
 import { Hono, type Context } from "hono";
+import { handle } from "hono/aws-lambda";
 import { Resource as SSTResource } from "sst";
 import { Pool } from "pg";
 import {
@@ -205,8 +206,11 @@ export async function handler(event: unknown, context: unknown): Promise<unknown
       jwtSecret: process.env.JWT_SECRET ?? "",
       dpoEmails: (process.env.DPO_EMAILS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     });
-    // Note: SST auto-injects DATABASE_URL when the Aurora cluster is `link`ed.
     void Res;
   }
-  return _app.app.fetch(event as Request);
+  // Use Hono's AWS Lambda adapter (handle from hono/aws-lambda) so the
+  // Lambda Function URL event is converted to a proper Request object before
+  // being passed to Hono's app.fetch(). Direct .fetch(event) fails because
+  // Hono expects a Request, not an API Gateway / Function URL event.
+  return handle(_app.app)(event as Parameters<typeof handle>[1], context as Parameters<typeof handle>[2]);
 }

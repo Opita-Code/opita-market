@@ -91,6 +91,14 @@ async function dispatchEvent(
       return handleReversed(txId, deps, escrowEvent);
     case "transaction.disputed":
       return handleDisputed(txId, deps, escrowEvent);
+    case "transaction.voided":
+      // Closes OPL-API-015 — voided transactions (cancelled before capture)
+      // terminate the flow. No reversal needed since no wallet credit.
+      return handleVoided(txId, deps, escrowEvent);
+    case "transaction.error":
+      // Closes OPL-API-015 — error events flag the tx as ERROR for DPO
+      // review. Wompi may retry; idempotency guards re-dispatch.
+      return handleError(txId, deps, escrowEvent);
     default:
       // Unknown event type — log and ack to prevent Wompi retry
       return { newState: "UNKNOWN_EVENT" };
@@ -184,6 +192,46 @@ async function handleDisputed(
     txId,
     fromState: "HELD",
     toState: "DISPUTED",
+    idempotencyKey: `${txId}:${escrowEvent}`,
+  });
+  return { newState: transition.toState };
+}
+
+/**
+ * Closes OPL-API-015 (INFO) — `transaction.voided` event disposition.
+ * Voided = cancelled before capture (Wompi-side, e.g. fraud block at the
+ * gateway). The merchant never sees a credit, so we simply mark the
+ * transaction as FAILED to release any PENDING_3DS lock.
+ */
+async function handleVoided(
+  txId: string,
+  deps: WebhookGatewayDeps,
+  escrowEvent: string,
+): Promise<{ newState: string }> {
+  const transition = await deps.transactTransition({
+    txId,
+    fromState: "PENDING",
+    toState: "FAILED",
+    idempotencyKey: `${txId}:${escrowEvent}`,
+  });
+  return { newState: transition.toState };
+}
+
+/**
+ * Closes OPL-API-015 (INFO) — `transaction.error` event disposition.
+ * Error = Wompi-side processing error (network blip, internal timeout).
+ * Mark the tx as ERROR so the reconciliation cron + DPO can re-drive it
+ * (the cron polls Wompi 24h back and corrects drift — see src/crons/reconciliation.ts).
+ */
+async function handleError(
+  txId: string,
+  deps: WebhookGatewayDeps,
+  escrowEvent: string,
+): Promise<{ newState: string }> {
+  const transition = await deps.transactTransition({
+    txId,
+    fromState: "PENDING",
+    toState: "ERROR",
     idempotencyKey: `${txId}:${escrowEvent}`,
   });
   return { newState: transition.toState };

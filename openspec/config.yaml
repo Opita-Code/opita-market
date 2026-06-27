@@ -3,20 +3,31 @@ mode: hybrid
 context: |
   Opita Market is a greenfield multi-vertical Colombian marketplace — real-time price dashboard + directory + comparator for ALL economic sectors. B2B + B2C. AI-2026-first. Phase 0 closed (critical decisions made: domains, multi-tenancy, monetization, IA pillar). Phase 1 (sdd-init) starting. Reuses opita-account-ui for auth, mercado patterns from sociedad-opita-app. Primary domain: market.opitacode.com. Multi-tenancy: Hybrid (single global catalog + optional tenant per claim). Pilar IA: MiniMax Token Plan API cloud (no local models). OSINT carta blanca (no robots.txt, scraping agresivo).
 
-strict_tdd: false
+strict_tdd: true
 
 testing:
-  runner: not-configured-yet
-  framework: vitest-plus-playwright-planned
+  runner: vitest
+  framework: vitest-plus-testcontainers-plus-playwright
   layers:
-    unit: pending
-    integration: pending
-    e2e: pending
-  coverage: pending
+    unit: vitest per-package
+    integration: vitest + testcontainers (Postgres) + @aws-sdk/client-dynamodb (LocalStack or moto)
+    e2e: playwright (apps/market-web/e2e/)
+  coverage:
+    minimum: 90
+    enforce: true
+    gate: ci-fail-under-90
+    critical_paths:
+      - "packages/pagos-service/src/lib/wompi.ts"
+      - "packages/pagos-service/src/lib/ledger.ts"
+      - "packages/pagos-service/src/lib/fraud.ts"
+      - "packages/pagos-service/src/lib/tiers.ts"
+      - "packages/pagos-service/src/lib/bonuses.ts"
+      - "packages/pagos-service/src/lib/ip-geolocation.ts"
   quality:
-    linter: eslint-planned
-    typechecker: typescript-planned
-    formatter: prettier-planned
+    linter: eslint (typescript-eslint)
+    typechecker: typescript (strict: true, noUncheckedIndexedAccess: true)
+    formatter: prettier
+    security: Snyk + npm audit (no high/critical CVEs allowed)
 
 phases:
   proposal:

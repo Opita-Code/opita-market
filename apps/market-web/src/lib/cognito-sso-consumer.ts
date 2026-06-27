@@ -15,6 +15,13 @@
  * Local-dev escape hatch: when NODE_ENV=development, set `x-dev-user: admin`
  * header (or `x-dev-groups: dpo,admin`) to bypass real JWT validation. This is
  * for local UI work only — production requires a real signed JWT.
+ *
+ * Environment resolution: market-web is deployed on Cloudflare Pages via
+ * @astrojs/cloudflare. In that runtime, `process.env` is NOT available —
+ * only `globalThis.env` (injected by the platform) is. In Vite/Node dev,
+ * `process.env` works (Vite injects it at build time). We resolve at call
+ * time, preferring `globalThis.env` to be Cloudflare-compatible, and fall
+ * back to `process.env` for local Node tests. Closes MW-FE-012.
  */
 import { jwtVerify, errors as joseErrors, type JWTPayload } from "jose";
 import type { AstroGlobal, APIContext } from "astro";
@@ -40,12 +47,32 @@ const DEV_HEADER_GROUPS = "x-dev-groups";
 const DEV_HEADER_EMAIL = "x-dev-email";
 
 /**
+ * Resolve env vars at runtime. Cloudflare Pages / Workers runtime exposes
+ * `globalThis.env` (injected by the platform). Vite/Node dev exposes
+ * `process.env`. We check `globalThis.env` first because the production
+ * runtime only has that surface, then fall back to `process.env` so local
+ * dev still works.
+ */
+function getEnv(): Record<string, string | undefined> {
+  const cfEnv = (globalThis as { env?: Record<string, string | undefined> })
+    .env;
+  if (cfEnv) return cfEnv;
+  const proc = (globalThis as { process?: { env?: Record<string, string> } })
+    .process;
+  if (proc?.env) {
+    return proc.env as Record<string, string | undefined>;
+  }
+  return {};
+}
+
+/**
  * Resolve the shared HMAC secret used to verify the JWT signature.
- * In production this is injected by SST as process.env.JWT_SECRET.
- * In local dev, it can be set in `.env` (gitignored).
+ * In production this is injected by Cloudflare Pages / Workers as
+ * `globalThis.env.JWT_SECRET`. In local dev, it can be set in `.env`
+ * (gitignored) which Vite exposes as `process.env.JWT_SECRET`.
  */
 function getSecret(): Uint8Array {
-  const raw = process.env.JWT_SECRET ?? "";
+  const raw = getEnv().JWT_SECRET ?? "";
   if (!raw) {
     throw new AuthError(
       "JWT_SECRET_MISSING",
@@ -81,8 +108,9 @@ function readCookie(context: APIContext | AstroGlobal): string | null {
 function maybeDevOverride(
   context: APIContext | AstroGlobal,
 ): CognitoUser | null {
-  if (process.env.NODE_ENV === "production") return null;
-  if (process.env.JWT_SECRET) return null; // real secret present — never use dev override
+  const env = getEnv();
+  if (env.NODE_ENV === "production") return null;
+  if (env.JWT_SECRET) return null; // real secret present — never use dev override
   const headers = context.request?.headers;
   if (!headers) return null;
   const user = headers.get(DEV_HEADER_USER);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ReconciliationCron, type ReconciliationStore, type WompiTxLookup } from "../../../crons/reconciliation.js";
+import { ReconciliationCron, type ReconciliationStore, type WompiTxLookup } from "../../../src/crons/reconciliation.js";
 
 /**
  * Tests for the reconciliation cron.
