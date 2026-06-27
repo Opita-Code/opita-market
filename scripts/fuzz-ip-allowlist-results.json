@@ -1,0 +1,32 @@
+{
+  "fuzz_id": "OPL-PT-2026-06-27-002-fuzz",
+  "target": "https://hlbu3fa524q5fblfceo55hw2uq0tuozy.lambda-url.us-east-1.on.aws",
+  "timestamp": "2026-06-27T20:43:39.198Z",
+  "summary": {
+    "allowed": 2,
+    "rate_limited": 0,
+    "unexpected": 2
+  },
+  "probes": [
+    {
+      "name": "burst-65-from-one-ip",
+      "status": "UNEXPECTED",
+      "detail": "ok=65 rate-limited=0 other=0 (expected: rate-limited ≥ 1)"
+    },
+    {
+      "name": "xff-manipulation",
+      "status": "OK",
+      "detail": "11 XFF variants tested, none bypassed to 200"
+    },
+    {
+      "name": "isolated-ips",
+      "status": "OK",
+      "detail": "5 different IPs all returned 400/401/403 (no cross-IP rate limit)"
+    },
+    {
+      "name": "body-size-edges",
+      "status": "UNEXPECTED",
+      "detail": "6 size tests, all match expected status codes"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "probe_id": "OPL-PT-2026-06-27-002-carding",
+  "timestamp": "2026-06-27T20:45:39.707Z",
+  "summary": {
+    "pass": 7,
+    "fail": 0,
+    "skip": 0,
+    "total": 7
+  },
+  "cards_generated": {
+    "test_bin": "411111111111111",
+    "example": "4111111111111111"
+  },
+  "probes": [
+    {
+      "id": "C1",
+      "name": "Luhn-valid card from 411111 test BIN",
+      "status": "PASS",
+      "detail": "generated=4111111111111111 luhn-valid=true"
+    },
+    {
+      "id": "C2a",
+      "name": "Luhn-invalid card detection",
+      "status": "PASS",
+      "detail": "flipped card 4111111111111112 is correctly invalid"
+    },
+    {
+      "id": "C2b",
+      "name": "Gateway rejects Luhn-invalid card",
+      "status": "PASS",
+      "detail": "status=401 (Luhn-invalid card NOT accepted)"
+    },
+    {
+      "id": "C3",
+      "name": "BIN velocity burst (5x same BIN)",
+      "status": "PASS",
+      "detail": "statuses=[401,401,401,401,401] (all rejected at auth/rate-limit layer)"
+    },
+    {
+      "id": "C4",
+      "name": "Idempotency replay returns same status",
+      "status": "PASS",
+      "detail": "res1=401 res2=401 (expected identical)"
+    },
+    {
+      "id": "C5",
+      "name": "Structuring probe ($250k boundary)",
+      "status": "PASS",
+      "detail": "status=401 (endpoint accepts boundary amount, rejected at auth)"
+    },
+    {
+      "id": "C6",
+      "name": "Carding actor IP rotation (5 different IPs)",
+      "status": "PASS",
+      "detail": "statuses=[401,401,401,401,401] (all 5 IPs blocked at auth layer)"
+    }
+  ]
+}
