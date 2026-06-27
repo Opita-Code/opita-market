@@ -73,7 +73,8 @@ for (const [envKey, secretName] of Object.entries(MAPPINGS)) {
     console.log(`  ✓ ${secretName} set (length: ${value.length})`);
     success++;
   } catch (err) {
-    console.error(`  ✗ ${secretName} — failed: ${(err as Error).message.split("\n")[0]}`);
+    const msg = err && err.message ? err.message.split("\n")[0] : String(err);
+    console.error(`  ✗ ${secretName} — failed: ${msg}`);
     failed++;
   }
 }
