@@ -1,17 +1,17 @@
 {
   "fuzz_id": "OPL-PT-2026-06-27-002-fuzz",
   "target": "https://hlbu3fa524q5fblfceo55hw2uq0tuozy.lambda-url.us-east-1.on.aws",
-  "timestamp": "2026-06-27T20:43:39.198Z",
+  "timestamp": "2026-06-27T20:53:21.334Z",
   "summary": {
-    "allowed": 2,
+    "allowed": 3,
     "rate_limited": 0,
-    "unexpected": 2
+    "unexpected": 1
   },
   "probes": [
     {
       "name": "burst-65-from-one-ip",
-      "status": "UNEXPECTED",
-      "detail": "ok=65 rate-limited=0 other=0 (expected: rate-limited ≥ 1)"
+      "status": "OK",
+      "detail": "ok=56 rate-limited=9 other=0 (expected: rate-limited ≥ 1)"
     },
     {
       "name": "xff-manipulation",
