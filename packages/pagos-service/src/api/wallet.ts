@@ -1,9 +1,11 @@
 import { Hono } from "hono";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { GetCommand, UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { requireUser } from "../lib/auth.js";
 import { InvalidStateError, InsufficientBalanceError, AmountInvalidError, WithdrawHoldNotElapsedError, TierLimitExceededError } from "../lib/errors.js";
 import { getAppContext } from "./index.js";
 import { TIERS, withdrawHoldFor, isValidTier, type Tier } from "../lib/tiers.js";
+import { transactP2PTransfer } from "../lib/transact/index.js";
 import { randomUUID } from "node:crypto";
 
 export const wallet = new Hono();
@@ -159,40 +161,18 @@ wallet.post("/:user/transfer", async (c) => {
     throw new AmountInvalidError("amount_cop must be a positive integer");
   }
 
-  // SECURITY: P2P transfer is currently NON-ATOMIC (separates reads + writes).
-  // Closes OPL-API-001 + OPL-CARD-003: PR 2.x uses transactP2PTransfer from PR 1.2.
-  const fromResult = await ctx.dynamoClient.send(
-    new GetCommand({
-      TableName: ctx.walletsTable,
-      Key: { user_id: fromUserId },
-    }),
-  );
-  const fromBalance = fromResult.Item?.balance_cop ?? 0;
-  if (fromBalance < amount) {
-    throw new InsufficientBalanceError(`Insufficient balance: ${fromBalance} < ${amount}`, fromBalance, amount);
-  }
-
-  await ctx.dynamoClient.send(
-    new UpdateCommand({
-      TableName: ctx.walletsTable,
-      Key: { user_id: fromUserId },
-      UpdateExpression: "SET balance_cop = balance_cop - :amt, version = version + :one, last_activity_at = :now",
-      ConditionExpression: "balance_cop >= :amt",
-      ExpressionAttributeValues: {
-        ":amt": amount, ":one": 1, ":now": new Date().toISOString(),
-      },
-    }),
-  );
-
-  await ctx.dynamoClient.send(
-    new UpdateCommand({
-      TableName: ctx.walletsTable,
-      Key: { user_id: toUserId },
-      UpdateExpression: "SET balance_cop = if_not_exists(balance_cop, :zero) + :amt, version = if_not_exists(version, :zero) + :one, last_activity_at = :now",
-      ExpressionAttributeValues: {
-        ":amt": amount, ":zero": 0, ":one": 1, ":now": new Date().toISOString(),
-      },
-    }),
+  // PR 2a — atomic P2P transfer via TransactWriteItems
+  // Closes: OPL-API-001, OPL-CARD-003 (funds-loss prevention)
+  // Both legs succeed or both fail. No TOCTOU race.
+  const baseClient = new DynamoDBClient({});
+  await transactP2PTransfer(
+    {
+      fromUserId,
+      toUserId,
+      amountCop: amount,
+      idempotencyKey: `${fromUserId}:${toUserId}:${Date.now()}:${randomUUID().slice(0, 8)}`,
+    },
+    { client: baseClient as any },
   );
 
   const ts = new Date().toISOString();

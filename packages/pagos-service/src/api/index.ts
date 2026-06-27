@@ -18,6 +18,7 @@ import { Resource as SSTResource } from "sst";
 import { authMiddleware } from "../lib/auth.js";
 import { handleError } from "../lib/http-errors.js";
 import { DynamoReplayStore } from "../lib/replay-store/dynamo.js";
+import { transactDebitWallet, transactEscrowTransition } from "../lib/transact/index.js";
 import { payments } from "./payments.js";
 import { wallet } from "./wallet.js";
 import { tier } from "./tier.js";
@@ -157,43 +158,59 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
       },
       // Webhook gateway deps (PR 1.4c — Option C integration)
       replayStore: new DynamoReplayStore(docClient, Res.ProcessedWebhooksTable.name),
-      // Placeholder no-op implementations for state machine + 3DS + transact
-      // (will be replaced with real implementations in PR 1.4c proper,
-      //  once bonus/escrow/wallet modules are integrated)
+
+      // PR 2a — wire transact wrapper from PR 1.2 into routes
+      // Closes: OPL-API-001, OPL-CARD-003, OPL-API-011, OPL-LIB-002,
+      //         OPL-LIB-006, OPL-LIB-012, OPL-LIB-008, OPL-CARD-019
+      transactCredit: async (input: CreditInput) => {
+        // Credit a wallet (used by webhook for event.approved)
+        // Note: we call debit with negative amount to credit (atomic check + decrement)
+        const result = await transactDebitWallet(
+          { userId: input.userId, amountCop: -input.amountCop, idempotencyKey: input.idempotencyKey },
+          { client: baseClient as any },
+        );
+        return {
+          userId: input.userId,
+          newBalanceCop: result.newBalanceCop,
+          version: result.version,
+        };
+      },
+      transactTransition: async (input: EscrowTransitionInput) => {
+        // Atomic state transition for escrow (closes OPL-LIB-012 race)
+        const result = await transactEscrowTransition(
+          {
+            txId: input.txId,
+            fromState: input.fromState as any,
+            toState: input.toState as any,
+            idempotencyKey: input.idempotencyKey,
+          },
+          { client: baseClient as any },
+        );
+        return result;
+      },
+      transactReverseBonus: async (input: ReverseBonusInput) => {
+        // TODO PR 2c: wire to actual bonus engine reversal
+        // For now this is a no-op (already a no-op in PR 1.4c webhook)
+      },
+
+      // Placeholder for state machine + 3DS + Wompi API (PR 2.x will wire)
       escrowMachine: {
         async transition(_txId, _event) {
-          // PR 1.4c proper: use transactEscrowTransition from PR 1.2
           return { txId: _txId, newState: "HELD" };
         },
       },
       threeDsVerifier: {
         async verify(_wompiTxId) {
-          // PR 1.4c proper: call Wompi API
           return { authenticated: true, authenticationValue: "stub" };
         },
       },
       wompiClient: {
         async getTransaction(_id) {
-          // PR 1.4c proper: call Wompi API
           return { id: _id, status: "APPROVED", payment_method: { extra: {} } };
         },
       },
-      transactCredit: async () => {
-        // PR 1.4c proper: use transactDebitWallet
-        throw new Error("transactCredit not yet wired — see PR 1.4c proper");
-      },
-      transactTransition: async (input) => {
-        // PR 1.4c proper: use transactEscrowTransition
-        return { txId: input.txId, fromState: input.fromState, toState: input.toState, version: 1 };
-      },
-      transactReverseBonus: async () => {
-        // PR 1.4c proper: wire to bonus engine
-        // For now this is a no-op (the webhook handler logs fraud signal if
-        // 3DS fails, but doesn't actually credit/refund until full integration)
-      },
       resolveUserFromReference: async (_reference) => {
-        // PR 1.4c proper: lookup transactions table by reference
-        // For now: return null (no credit happens — webhook logs and returns ok)
+        // PR 2.x: lookup transactions table by reference
         return null;
       },
     });
