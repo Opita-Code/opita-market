@@ -294,6 +294,20 @@ export default $config({
     });
 
     // ====================================================================
+    // PR 4a — UIAF reports store (closes OPL-COMP-015 SAR persistence)
+    //
+    // UiafReportsTable: SAR (Suspicious Activity Report) records.
+    //   pk: sar_id
+    //   TTL: 5 years (UIAF retention requirement per Circular Externa 029/2014)
+    //   Immutable — operator files via UIAF portal, then updates status to FILED
+    // ====================================================================
+    const uiafReportsTable = new sst.aws.Dynamo("UiafReportsTable", {
+      fields: { sar_id: "string" },
+      primaryIndex: { hashKey: "sar_id" },
+      ttl: "ttl_epoch",
+    });
+
+    // ====================================================================
     // 6c. PagosAPI Lambda — REPLICATES ComplianceAPI architecture.
     //     Hybrid deploy: SST v4 Lambda with Function URL.
     //     Link: DDB tables + Wompi secrets + shared JWT secret.
@@ -321,6 +335,7 @@ export default $config({
         userHistoryTable,
         bonusDailyCounterTable,
         referralMonthlyCounterTable,
+        uiafReportsTable,
         wompiPublicKey,
         wompiPrivateKey,
         wompiEventsSecret,
@@ -409,6 +424,7 @@ export default $config({
       UserHistoryTableName: userHistoryTable.name,
       BonusDailyCounterTableName: bonusDailyCounterTable.name,
       ReferralMonthlyCounterTableName: referralMonthlyCounterTable.name,
+      UiafReportsTableName: uiafReportsTable.name,
       MarketWebUrl: "https://market-dev.opitacode.com (Cloudflare Pages, NOT this SST stack)",
       DpoAlertsTopicArn: dpoAlertsTopic.arn,
     };
