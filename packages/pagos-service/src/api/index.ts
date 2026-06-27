@@ -33,6 +33,8 @@ import {
   MockComplianceScreeningProvider,
 } from "../lib/compliance-screening-mock.js";
 import type { ComplianceScreeningProvider } from "../lib/compliance-screening.js";
+import { DynamoOppositionStore } from "../lib/habeas-data-dynamo.js";
+import type { OppositionStore } from "../lib/habeas-data.js";
 import { payments } from "./payments.js";
 import { wallet } from "./wallet.js";
 import { tier } from "./tier.js";
@@ -93,6 +95,8 @@ export interface AppContext {
   // PR 4b — Compliance screening provider (closes OPL-COMP-018, OPL-COMP-019)
   // Currently MockComplianceScreeningProvider — swap to ComplyAdvantage when operator commits to $$$.
   complianceScreeningProvider: ComplianceScreeningProvider;
+  // PR 5 — Habeas Data opposition + TOS acceptance (closes OPL-COMP-002, OPL-COMP-021)
+  oppositionStore: OppositionStore;
 }
 
 let appContext: AppContext | null = null;
@@ -150,6 +154,9 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
       UserHistoryTable: { name: string };
       BonusDailyCounterTable: { name: string };
       ReferralMonthlyCounterTable: { name: string };
+      UiafReportsTable: { name: string };
+      HabeasDataOppositionsTable: { name: string };
+      TosAcceptancesTable: { name: string };
       WompiPublicKey: { value: string };
       WompiPrivateKey: { value: string };
       WompiEventsSecret: { value: string };
@@ -205,6 +212,13 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
       //   })
       // See compliance-screening-complyadvantage.ts for the production skeleton.
       complianceScreeningProvider: new MockComplianceScreeningProvider(),
+
+      // PR 5 — Habeas Data opposition store (closes OPL-COMP-002, OPL-COMP-021)
+      oppositionStore: new DynamoOppositionStore(
+        docClient,
+        Res.HabeasDataOppositionsTable.name,
+        Res.TosAcceptancesTable.name,
+      ),
 
       // PR 2a — wire transact wrapper from PR 1.2 into routes
       // Closes: OPL-API-001, OPL-CARD-003, OPL-API-011, OPL-LIB-002,

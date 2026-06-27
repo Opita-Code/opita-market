@@ -314,6 +314,29 @@ export default $config({
     // const complyAdvantageApiKey = new sst.Secret("ComplyAdvantageApiKey");
 
     // ====================================================================
+    // PR 5 — Habeas Data opposition store (closes OPL-COMP-002, OPL-COMP-021)
+    //
+    // HabeasDataOppositionsTable: per-user opposition requests.
+    //   pk: user_id, range: request_id (sortable by date)
+    //   TTL: 5 years (Ley 1581 + Decreto 1377/2013 audit retention)
+    //
+    // TosAcceptancesTable: per-user TOS acceptance records.
+    //   pk: user_id, range: acceptance_id
+    //   TTL: 5 years (Estatuto 1480 consumer protection)
+    // ====================================================================
+    const habeasDataOppositionsTable = new sst.aws.Dynamo("HabeasDataOppositionsTable", {
+      fields: { user_id: "string", request_id: "string" },
+      primaryIndex: { hashKey: "user_id", rangeKey: "request_id" },
+      ttl: "ttl_epoch",
+    });
+
+    const tosAcceptancesTable = new sst.aws.Dynamo("TosAcceptancesTable", {
+      fields: { user_id: "string", acceptance_id: "string" },
+      primaryIndex: { hashKey: "user_id", rangeKey: "acceptance_id" },
+      ttl: "ttl_epoch",
+    });
+
+    // ====================================================================
     // 6c. PagosAPI Lambda — REPLICATES ComplianceAPI architecture.
     //     Hybrid deploy: SST v4 Lambda with Function URL.
     //     Link: DDB tables + Wompi secrets + shared JWT secret.
@@ -342,6 +365,8 @@ export default $config({
         bonusDailyCounterTable,
         referralMonthlyCounterTable,
         uiafReportsTable,
+        habeasDataOppositionsTable,
+        tosAcceptancesTable,
         wompiPublicKey,
         wompiPrivateKey,
         wompiEventsSecret,
@@ -431,6 +456,8 @@ export default $config({
       BonusDailyCounterTableName: bonusDailyCounterTable.name,
       ReferralMonthlyCounterTableName: referralMonthlyCounterTable.name,
       UiafReportsTableName: uiafReportsTable.name,
+      HabeasDataOppositionsTableName: habeasDataOppositionsTable.name,
+      TosAcceptancesTableName: tosAcceptancesTable.name,
       MarketWebUrl: "https://market-dev.opitacode.com (Cloudflare Pages, NOT this SST stack)",
       DpoAlertsTopicArn: dpoAlertsTopic.arn,
     };
