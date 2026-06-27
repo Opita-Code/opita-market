@@ -224,6 +224,34 @@ export class InvalidSignatureError extends OpitaPagosError {
   }
 }
 
+// ─── Bonus cap errors (PR 2d — closes OPL-LIB-003, OPL-CARD-005, OPL-CARD-011) ─
+
+export class DailyAmountLimitExceededError extends OpitaPagosError {
+  readonly code = "DAILY_AMOUNT_LIMIT_EXCEEDED";
+  readonly httpStatus = 422;
+  constructor(
+    message: string,
+    public readonly ruleId: string,
+    public readonly limitCop: number,
+    public readonly attemptedCop: number,
+  ) {
+    super(message, false);  // do NOT expose internal amount to clients
+  }
+}
+
+export class DailyClaimLimitExceededError extends OpitaPagosError {
+  readonly code = "DAILY_CLAIM_LIMIT_EXCEEDED";
+  readonly httpStatus = 422;
+  constructor(
+    message: string,
+    public readonly ruleId: string,
+    public readonly limitClaims: number,
+    public readonly attemptedClaims: number,
+  ) {
+    super(message, false);
+  }
+}
+
 // ─── Internal errors ─────────────────────────────────────────────────────────
 
 export class InternalError extends OpitaPagosError {

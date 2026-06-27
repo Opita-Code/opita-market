@@ -51,7 +51,7 @@ bonuses.post("/:user/trigger", async (c) => {
   const ruleId = String(body?.rule_id ?? "");
   if (!ruleId) throw new AmountInvalidError("rule_id is required");
 
-  const engine = new BonusEngine({ store: makeBonusStore(ctx) });
+  const engine = new BonusEngine({ store: makeBonusStore(ctx), dailyCounter: ctx.bonusDailyCounter });
   const result = await engine.triggerRule({
     userId: targetUser,
     ruleId: ruleId as any,

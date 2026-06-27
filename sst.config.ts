@@ -265,6 +265,21 @@ export default $config({
     });
 
     // ====================================================================
+    // PR 2d — Bonus daily counter (closes OPL-LIB-003, OPL-CARD-011)
+    //
+    // BonusDailyCounterTable: tracks cumulative bonus amount + claim count
+    //   per (user_id, rule_id, YYYY-MM-DD-UTC). 7d TTL.
+    //   pk: counter_id = `${user_id}:${rule_id}:${date}`
+    //   attrs: amount_cop, claims_count
+    //   Atomic ADD via UpdateCommand.
+    // ====================================================================
+    const bonusDailyCounterTable = new sst.aws.Dynamo("BonusDailyCounterTable", {
+      fields: { counter_id: "string" },
+      primaryIndex: { hashKey: "counter_id" },
+      ttl: "ttl_epoch",
+    });
+
+    // ====================================================================
     // 6c. PagosAPI Lambda — REPLICATES ComplianceAPI architecture.
     //     Hybrid deploy: SST v4 Lambda with Function URL.
     //     Link: DDB tables + Wompi secrets + shared JWT secret.
@@ -290,6 +305,7 @@ export default $config({
         processedWebhooksTable,
         velocityCountersTable,
         userHistoryTable,
+        bonusDailyCounterTable,
         wompiPublicKey,
         wompiPrivateKey,
         wompiEventsSecret,
@@ -376,6 +392,7 @@ export default $config({
       ProcessedWebhooksTableName: processedWebhooksTable.name,
       VelocityCountersTableName: velocityCountersTable.name,
       UserHistoryTableName: userHistoryTable.name,
+      BonusDailyCounterTableName: bonusDailyCounterTable.name,
       MarketWebUrl: "https://market-dev.opitacode.com (Cloudflare Pages, NOT this SST stack)",
       DpoAlertsTopicArn: dpoAlertsTopic.arn,
     };

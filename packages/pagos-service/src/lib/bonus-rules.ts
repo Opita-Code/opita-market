@@ -28,6 +28,11 @@ export interface BonusRuleConfig {
   multiplier: number;
   /** If true, this bonus is reversed when the originating transaction is refunded. */
   reversalOnChargeback: boolean;
+  /** PR 2d — Daily cap fields (closes OPL-LIB-003, OPL-CARD-005, OPL-CARD-011). */
+  /** Max claims per user per day (undefined = no claim cap). */
+  maxClaimsPerDay?: number;
+  /** Max cumulative COP per user per day from this rule (undefined = no amount cap). */
+  maxAmountPerDayCop?: number;
 }
 
 export const BONUS_RULES: Record<BonusRuleId, BonusRuleConfig> = {
@@ -84,6 +89,9 @@ export const BONUS_RULES: Record<BonusRuleId, BonusRuleConfig> = {
     cooldownSeconds: 0,
     multiplier: 1.0,
     reversalOnChargeback: true,
+    // PR 2d — daily caps
+    maxClaimsPerDay: 1,
+    maxAmountPerDayCop: 100_000,
   },
   PURCHASE_CASHBACK: {
     id: "PURCHASE_CASHBACK",
@@ -93,6 +101,9 @@ export const BONUS_RULES: Record<BonusRuleId, BonusRuleConfig> = {
     cooldownSeconds: 0,
     multiplier: 1.0,
     reversalOnChargeback: true,
+    // PR 2d — daily caps (closes OPL-LIB-003 + OPL-CARD-011)
+    maxClaimsPerDay: 20,
+    maxAmountPerDayCop: 100_000,
   },
   SELLER_FIRST_SALE: {
     id: "SELLER_FIRST_SALE",
@@ -147,6 +158,7 @@ export const BONUS_RULES: Record<BonusRuleId, BonusRuleConfig> = {
     cooldownSeconds: 24 * 60 * 60,
     multiplier: 1.0,
     reversalOnChargeback: false,
+    maxClaimsPerDay: 1,  // PR 2d — prevent login-spam farming
   },
   STREAK_7_DAYS: {
     id: "STREAK_7_DAYS",

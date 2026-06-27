@@ -25,6 +25,8 @@ import {
   type VelocityCounter,
   type UserHistory,
 } from "../lib/velocity/index.js";
+import { DynamoBonusDailyCounter } from "../lib/bonus-daily-counter-dynamo.js";
+import type { BonusDailyCounter } from "../lib/bonus-daily-counter.js";
 import { payments } from "./payments.js";
 import { wallet } from "./wallet.js";
 import { tier } from "./tier.js";
@@ -78,6 +80,8 @@ export interface AppContext {
   // PR 2c — Velocity + user history (closes OPL-CARD-001/007/012/013/015)
   velocityCounter: VelocityCounter;
   userHistory: UserHistory;
+  // PR 2d — Bonus daily counter (closes OPL-LIB-003, OPL-CARD-011)
+  bonusDailyCounter: BonusDailyCounter;
 }
 
 let appContext: AppContext | null = null;
@@ -133,6 +137,7 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
       ProcessedWebhooksTable: { name: string };
       VelocityCountersTable: { name: string };
       UserHistoryTable: { name: string };
+      BonusDailyCounterTable: { name: string };
       WompiPublicKey: { value: string };
       WompiPrivateKey: { value: string };
       WompiEventsSecret: { value: string };
@@ -173,6 +178,9 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
       // PR 2c — velocity counter + user history (closes OPL-CARD-001/007/012/013/015)
       velocityCounter: new DynamoVelocityCounter(docClient, Res.VelocityCountersTable.name),
       userHistory: new DynamoUserHistory(docClient, Res.UserHistoryTable.name),
+
+      // PR 2d — bonus daily counter (closes OPL-LIB-003, OPL-CARD-011)
+      bonusDailyCounter: new DynamoBonusDailyCounter(docClient, Res.BonusDailyCounterTable.name),
 
       // PR 2a — wire transact wrapper from PR 1.2 into routes
       // Closes: OPL-API-001, OPL-CARD-003, OPL-API-011, OPL-LIB-002,
