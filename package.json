@@ -1,0 +1,37 @@
+{
+  "name": "opita-market",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-vertical Colombian marketplace — Habeas Data (Ley 1581/2012) compliant by design",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "sst dev",
+    "build": "npm run build --workspaces --if-present",
+    "deploy": "sst deploy",
+    "deploy:prod": "sst deploy --stage prod",
+    "remove": "sst remove",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "test": "npm run test --workspaces --if-present",
+    "audit:bundle": "node scripts/audit-bundle.mjs",
+    "preflight": "npm run typecheck && npm run lint && npm run test && npm run audit:bundle",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.16",
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^20.14.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "sst": "^4.13.1",
+    "typescript": "^5.4.0"
+  }
+}

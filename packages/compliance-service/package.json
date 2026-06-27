@@ -1,0 +1,33 @@
+{
+  "name": "@opita-market/compliance-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "description": "Ley 1581/2012 compliance — NIT+DV verification, titular-rights workflows, audit log",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.1075.0",
+    "@aws-sdk/client-dynamodb": "^3.1075.0",
+    "@aws-sdk/client-s3": "^3.1075.0",
+    "@aws-sdk/client-secrets-manager": "^3.1075.0",
+    "@aws-sdk/client-ses": "^3.1075.0",
+    "@aws-sdk/lib-dynamodb": "^3.1075.0",
+    "hono": "^4.12.27",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.2.0",
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.20.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

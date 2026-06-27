@@ -1,0 +1,45 @@
+---
+import "../styles/global.css";
+import Footer from "../components/Footer.astro";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "Opita Market — marketplace multi-vertical colombiano" } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://market.opitacode.com").toString();
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="robots" content="index, follow" />
+  </head>
+  <body class="bg-white text-slate-900">
+    <header class="border-b border-slate-200 bg-white">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <a href="/" class="text-xl font-bold text-sky-700">
+          Opita Market
+        </a>
+        <nav class="flex gap-4 text-sm text-slate-600">
+          <a href="/" class="hover:text-sky-700">Inicio</a>
+          <a href="/legal/ptd" class="hover:text-sky-700">PTD</a>
+          <a href="/legal/aviso" class="hover:text-sky-700">Aviso</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <Footer />
+  </body>
+</html>

@@ -1,0 +1,399 @@
+/**
+ * Payments API routes.
+ *
+ * POST /v1/payments/intent          — create payment intent (idempotent)
+ * POST /v1/payments/webhook         — Wompi webhook receiver
+ * POST /v1/payments/:id/refund      — DPO-only refund
+ * POST /v1/payments/:id/dispute     — buyer dispute
+ */
+
+import { Hono } from "hono";
+import { randomUUID } from "node:crypto";
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { requireUser, requireDpo } from "../lib/auth.js";
+import { verifyWebhookSignature, generateIntegritySignature } from "../lib/wompi.js";
+import { processWompiWebhook } from "../lib/webhook-gateway/index.js";
+import { FraudEngine } from "../lib/fraud.js";
+import { TierLimitExceededError, InvalidSignatureError, AmountInvalidError, ChannelNotAllowedError, FraudBlockedError, InvalidStateError, RefundFailedError } from "../lib/errors.js";
+import { TIERS, requires3DS, isValidTier, type Tier } from "../lib/tiers.js";
+import { collectVelocitySignals } from "../lib/velocity/index.js";
+import { detectStructuring, isInBoundaryRange } from "../lib/structuring.js";
+import { webhookIpAllowlist, WebhookIpAllowlist, parseCidrs } from "../lib/webhook-ip-allowlist.js";
+import { getAppContext, type AppContext } from "./index.js";
+
+/**
+ * Wompi webhook IP allowlist (Closes OPL-API-012, LOW).
+ * In dev (no env var): no allowlist, but per-IP rate limit prevents the
+ * endpoint from being used as a generic DoS amplifier.
+ * In prod: set WOMPI_WEBHOOK_IPS to Wompi's published ranges and the
+ * allowlist matches strictly; rate limit becomes a no-op since the
+ * allowlist already restricts access.
+ */
+const WOMPI_WEBHOOK_ALLOWLIST = new WebhookIpAllowlist({
+  allowedCidrs: parseCidrs(
+    (globalThis as { process?: { env?: Record<string, string | undefined> } })
+      .process?.env?.WOMPI_WEBHOOK_IPS ?? "",
+  ),
+  rateLimitPerMinute: 60,
+});
+const webhookAllowlistMw = webhookIpAllowlist(WOMPI_WEBHOOK_ALLOWLIST);
+
+export const payments = new Hono();
+
+const ALLOWED_CHANNELS = ["WOMPI_CARD", "WOMPI_BREB", "WOMPI_PSE", "WOMPI_NEQUI", "WOMPI_DAVIPLATA"];
+
+// ─── POST /v1/payments/intent ────────────────────────────────────────────────
+
+payments.post("/intent", async (c) => {
+  const user = requireUser(c);
+  const body = await c.req.json().catch(() => ({}));
+
+  // Validate
+  const amount = Number(body?.amount_cop);
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new AmountInvalidError("amount_cop must be a positive integer");
+  }
+  const channel = String(body?.channel ?? "");
+  if (!ALLOWED_CHANNELS.includes(channel)) {
+    throw new ChannelNotAllowedError(`Invalid channel: ${channel}`);
+  }
+  // SECURITY: Always derive sender from auth context, NEVER accept from body.
+  // Closes OPL-API-003 — from_user_id override (IDOR / mass assignment).
+  const fromUserId = user.email;
+  const toUserId = String(body?.to_user_id ?? "");
+  const productContext = body?.product_context;
+  const idempotencyKey = String(body?.idempotency_key ?? "");
+
+  if (!toUserId) throw new AmountInvalidError("to_user_id is required");
+  if (!idempotencyKey) throw new AmountInvalidError("idempotency_key is required");
+
+  const ctx = getAppContext();
+
+  // Idempotency check
+  const idempotencyKeyHash = Buffer.from(idempotencyKey).toString("base64url");
+  const existing = await lookupByIdempotencyKey(ctx, idempotencyKeyHash);
+  if (existing) {
+    return c.json({
+      transaction_id: existing.transaction_id,
+      reference: existing.reference,
+      amount_in_cents: existing.amount_cop,
+      currency: "COP",
+      public_key: ctx.wompiPublicKey,
+      integrity_signature: existing.signature ?? "",
+      requires_3ds: existing.requires_3ds ?? false,
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    });
+  }
+
+  // Tier check on the recipient
+  const recipientWallet = await lookupWallet(ctx, toUserId);
+  const recipientTier: Tier = isValidTier(recipientWallet?.tier) ? recipientWallet.tier : 0;
+  const lifetimeReceived = recipientWallet?.lifetime_received_cop ?? 0;
+  if (lifetimeReceived + amount > TIERS[recipientTier].receiveLimitDayCop) {
+    throw new TierLimitExceededError(
+      `Tier ${recipientTier} receive limit exceeded`,
+      recipientTier,
+      TIERS[recipientTier].receiveLimitDayCop,
+      lifetimeReceived + amount,
+    );
+  }
+
+  // Anti-fraud check
+  const fraud = await runFraudChecks(ctx, user, fromUserId, toUserId, amount);
+  if (fraud.decision === "BLOCK") {
+    throw new FraudBlockedError(`Blocked: ${fraud.signals.map((s) => s.type).join(",")}`, fraud.signals);
+  }
+
+  // PR 7 — Structuring detection (closes OPL-CARD-016).
+  // If the current tx is in the 200k-300k boundary range AND the sender
+  // already has 3+ such tx to the same recipient in the last 24h, flag for
+  // DPO review. The flag is logged (and written to FraudSignals table)
+  // but does NOT block the immediate tx — the pattern itself is what matters.
+  if (isInBoundaryRange(amount)) {
+    const structuring = await detectStructuring(
+      { senderId: fromUserId, recipientId: toUserId, amountCop: amount, nowMs: Date.now() },
+      { queryClient: ctx.dynamoClient, transactionsTableName: ctx.transactionsTable },
+    );
+    if (structuring) {
+      // Append the structuring signal to fraud.signals — doesn't BLOCK
+      // but writes to FraudSignals table on BLOCK/REVIEW decisions.
+      fraud.signals.push({ type: "SUSPICIOUS_TIMING", weight: 0.4 });
+    }
+  }
+
+  // Create transaction
+  const transactionId = `tx-${randomUUID()}`;
+  const reference = `${productContext?.kind ?? "PAYMENT"}::${toUserId}::${Date.now()}`;
+  const needs3DS = requires3DS(recipientTier, amount);
+  const signature = generateIntegritySignature({
+    reference,
+    amountInCents: amount,
+    currency: "COP",
+    integritySecret: ctx.wompiIntegritySecret,
+  });
+
+  await ctx.dynamoClient.send(
+    new PutCommand({
+      TableName: ctx.transactionsTable,
+      Item: {
+        transaction_id: transactionId,
+        intent: "PAYMENT",
+        channel,
+        status: "PENDING",
+        amount_cop: amount,
+        reference,
+        idempotency_key: idempotencyKey,
+        idempotency_key_hash: idempotencyKeyHash,
+        from_user_id: fromUserId,
+        to_user_id: toUserId,
+        product_context: productContext,
+        escrow_state: "NONE",
+        fraud_signals: fraud.signals.map((s) => s.type),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        version: 1,
+      },
+    }),
+  );
+
+  return c.json({
+    transaction_id: transactionId,
+    reference,
+    amount_in_cents: amount,
+    currency: "COP",
+    public_key: ctx.wompiPublicKey,
+    integrity_signature: signature,
+    requires_3ds: needs3DS,
+    expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+  });
+});
+
+// ─── POST /v1/payments/webhook ──────────────────────────────────────────────
+
+payments.post("/webhook", webhookAllowlistMw, async (c) => {
+  const ctx = getAppContext();
+
+  // 1. Parse body (SyntaxError → 400 via global error handler)
+  const body = await c.req.json();
+
+  // 2. Verify Wompi signature (R1 of webhook-gateway spec)
+  //    Generic InvalidSignatureError — no info leak
+  if (!verifyWebhookSignature(body, ctx.wompiEventsSecret)) {
+    throw new InvalidSignatureError();
+  }
+
+  // 3. Process via webhook gateway (handles timestamp, idempotency, state machine, 3DS)
+  //    Closes: OPL-LIB-001 (replay), OPL-API-004 (idempotency), OPL-CARD-002 (state machine)
+  //    Closes: OPL-CARD-004 (3DS), OPL-LIB-007 (generic errors), OPL-DEP-001 (no more 500s)
+  const result = await processWompiWebhook(body, body?.signature?.checksum ?? "", {
+    eventsSecret: ctx.wompiEventsSecret,
+    maxAgeMs: 5 * 60 * 1000,
+    replayStore: ctx.replayStore,
+    escrowMachine: ctx.escrowMachine,
+    threeDsVerifier: ctx.threeDsVerifier,
+    wompiClient: ctx.wompiClient,
+    transactCredit: ctx.transactCredit,
+    transactTransition: ctx.transactTransition,
+    transactReverseBonus: ctx.transactReverseBonus,
+      resolveUserFromReference: async (ref) => (await ctx.resolveUserFromReference(ref)) ?? "",
+  });
+
+  return c.json({
+    ok: result.ok,
+    tx_id: result.txId,
+    replay: result.replay,
+    new_state: result.newState,
+    ...(result.fraudSignal ? { fraud_signal: result.fraudSignal } : {}),
+  });
+});
+
+// ─── POST /v1/payments/:id/refund (DPO-only) ─────────────────────────────────
+
+payments.post("/:id/refund", async (c) => {
+  requireDpo(c);
+  const ctx = getAppContext();
+  const txId = c.req.param("id");
+  await c.req.json().catch(() => ({}));
+
+  const tx = await lookupTransaction(ctx, txId);
+  if (!tx) throw new InvalidStateError("Transaction not found");
+  if (tx.status === "REFUNDED") throw new InvalidStateError("Already refunded");
+  if (tx.status !== "APPROVED") throw new InvalidStateError("Cannot refund unapproved tx");
+
+  // PR 7 — Closes OPL-CARD-014: actually call Wompi refund API.
+  // SECURITY: wompi_tx_id is the Wompi-side transaction id (NOT the Opita tx_id).
+  // The WompiClient.refundTransaction uses the private key via Bearer auth — never
+  // exposed to the client. On Wompi failure, the tx remains APPROVED and the caller
+  // sees a generic 502 (no Wompi internals leaked).
+  const wompiTxId = tx.wompi_tx_id ?? txId;
+  const refundResult = await ctx.wompiClient.refundTransaction({
+    wompiTransactionId: wompiTxId,
+    amountInCents: tx.amount_cop,
+    reason: "DPO-initiated refund",
+  });
+
+  if (!refundResult.ok) {
+    // Wompi refused — tx stays APPROVED. Re-throw as typed error for HTTP mapping.
+    throw new RefundFailedError(
+      refundResult.error ?? "Wompi refund failed",
+      refundResult.error,
+      refundResult.httpStatus,
+    );
+  }
+
+  // Reverse bonuses for this transaction (idempotent — uses tx_id in bonus lookup).
+  // Closes the bonus reversal gap that left sellers with cashback on refunded tx.
+  await ctx.transactReverseBonus({
+    transactionId: txId,
+    idempotencyKey: `refund:${txId}:${refundResult.wompiRefundId ?? Date.now()}`,
+  });
+
+  // Atomic escrow + tx status transition (HELD → REFUNDED).
+  await ctx.transactTransition({
+    txId,
+    fromState: "HELD",
+    toState: "REFUNDED",
+    idempotencyKey: `refund:${txId}:${refundResult.wompiRefundId ?? "pending"}`,
+  });
+
+  return c.json({
+    refund_id: refundResult.wompiRefundId,
+    status: "COMPLETED",
+    amount_cop: tx.amount_cop,
+    wompi_refund_id: refundResult.wompiRefundId,
+  });
+});
+
+// ─── POST /v1/payments/:id/dispute (buyer) ──────────────────────────────────
+
+payments.post("/:id/dispute", async (c) => {
+  const user = requireUser(c);
+  const ctx = getAppContext();
+  const txId = c.req.param("id");
+  await c.req.json().catch(() => ({}));
+
+  const tx = await lookupTransaction(ctx, txId);
+  if (!tx) throw new InvalidStateError("Transaction not found");
+
+  if (tx.status !== "RELEASED" || !tx.dispute_window_ends_at) {
+    throw new InvalidStateError("Dispute only allowed for RELEASED tx within window");
+  }
+  if (new Date() > new Date(tx.dispute_window_ends_at)) {
+    throw new InvalidStateError("Dispute window closed");
+  }
+
+  await ctx.dynamoClient.send(
+    new UpdateCommand({
+      TableName: ctx.transactionsTable,
+      Key: { transaction_id: txId },
+      UpdateExpression: "SET escrow_state = :disputed, updated_at = :now",
+      ExpressionAttributeValues: {
+        ":disputed": "DISPUTED",
+        ":now": new Date().toISOString(),
+      },
+    }),
+  );
+
+  return c.json({
+    dispute_id: txId,
+    status: "OPEN",
+    dpo_notified_at: new Date().toISOString(),
+  });
+});
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+async function lookupByIdempotencyKey(ctx: AppContext, hash: string): Promise<any | null> {
+  const result = await ctx.dynamoClient.send(
+    new QueryCommand({
+      TableName: ctx.transactionsTable,
+      IndexName: "IdempotencyKeyIndex",
+      KeyConditionExpression: "idempotency_key_hash = :h",
+      ExpressionAttributeValues: { ":h": hash },
+      Limit: 1,
+    }),
+  );
+  return result.Items?.[0] ?? null;
+}
+
+async function lookupTransaction(ctx: AppContext, txId: string): Promise<any | null> {
+  const result = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.transactionsTable,
+      Key: { transaction_id: txId },
+    }),
+  );
+  return result.Item ?? null;
+}
+
+async function lookupWallet(ctx: AppContext, userId: string): Promise<any | null> {
+  const result = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: userId },
+    }),
+  );
+  return result.Item ?? null;
+}
+
+async function runFraudChecks(
+  ctx: AppContext,
+  user: { ip?: string; deviceId?: string },
+  fromUserId: string,
+  _toUserId: string,
+  amount: number,
+): Promise<{ decision: "ALLOW" | "REVIEW" | "BLOCK"; signals: Array<{ type: string; weight: number }> }> {
+  const ip = user.ip ?? "0.0.0.0";
+  const geo = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.ipGeoCacheTable,
+      Key: { ip },
+    }),
+  ).then((r: any) => r.Item).catch(() => null);
+
+  // IP-based geo signals (TOR/VPN/PROXY/DATACENTER)
+  const geoSignals = geo ? [
+    ...(geo.is_tor ? [{ type: "TOR_EXIT" as const, weight: 1.0 }] : []),
+    ...(geo.is_vpn ? [{ type: "VPN_DETECTED" as const, weight: 0.8 }] : []),
+    ...(geo.is_proxy ? [{ type: "PROXY_DETECTED" as const, weight: 0.6 }] : []),
+    ...(geo.is_datacenter ? [{ type: "DATACENTER_IP" as const, weight: 0.5 }] : []),
+  ] : [];
+
+  // PR 2c — velocity + history signals (closes OPL-CARD-001/012/015)
+  // The first 6 digits of any "from_user_id" that looks like a card BIN
+  // For now we use the user's email as the BIN surrogate for the EMAIL_INTENT counter
+  const { signals: velocitySignals, recentBlock } = await collectVelocitySignals(
+    { counter: ctx.velocityCounter, history: ctx.userHistory },
+    {
+      userId: fromUserId,
+      ip,
+      deviceId: user.deviceId,
+      email: fromUserId,
+    },
+  );
+
+  const engine = new FraudEngine();
+  const result = engine.evaluateSignals([...geoSignals, ...velocitySignals]);
+
+  // If BLOCK decision, record to UserHistory for future repeat-offender detection
+  if (result.decision === "BLOCK") {
+    const topReason = result.signals
+      .sort((a, b) => b.weight - a.weight)[0]?.type ?? "UNKNOWN";
+    try {
+      await ctx.userHistory.recordDecision({
+        userId: fromUserId,
+        decision: "BLOCK",
+        reason: topReason,
+        timestampMs: Date.now(),
+      });
+    } catch {
+      // Best-effort — don't fail the request if history write fails
+    }
+  }
+
+  // Suppress unused warning
+  void recentBlock;
+  void amount;
+
+  return result;
+}

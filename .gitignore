@@ -17,6 +17,9 @@ build/
 .sst/
 .opencode/
 
+# Astro build cache (per-app)
+apps/*/.astro/
+
 # Dark-mem local cache (not the project memory)
 .dark-mem-cache/
 

@@ -1,0 +1,35 @@
+# scripts/deploy/
+
+Production deployment scripts and checklists for Opita Market.
+
+## Files
+
+- `production-checklist.sh` — pre-deploy gate. Runs the RNBD prereqs
+  sub-check + records the DPO sign-off. **All 10 steps must show OK +
+  DPO initials + sign-off date before `sst deploy --stage prod` runs.**
+
+## Workflow
+
+```
+# 1. Run the checklist (mandatory gate).
+bash scripts/deploy/production-checklist.sh
+
+# 2. If the checklist exits 0, deploy.
+npx sst deploy --stage prod
+
+# 3. Run the post-deploy smoke test.
+cd apps/market-web
+PLAYWRIGHT_BASE_URL=https://market.opitacode.com npm run test:e2e
+```
+
+## Hard rules
+
+- The DPO sign-off gate cannot be bypassed. If the operator does not
+  have DPO initials to provide, the deploy is BLOCKED. This is
+  intentional: a Habeas Data database going live without DPO sign-off
+  violates Ley 1581/2012 Art. 18.
+- A failed sub-check (e.g. RNBD prereqs found a missing secret) blocks
+  the deploy even if DPO initials are provided.
+- The checklist does NOT call `sst deploy` itself — the operator runs
+  it after the checklist passes. This keeps the script idempotent and
+  auditable.

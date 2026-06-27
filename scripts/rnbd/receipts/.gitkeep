@@ -1,0 +1,34 @@
+# scripts/rnbd/receipts/
+
+This directory holds the SIC-issued PDF receipts that prove our RNBD
+(Registro Nacional de Bases de Datos) registration.
+
+## Workflow
+
+1. After submitting the RNBD registration via the SIC portal, save the
+   issued PDF here with a date-prefixed filename:
+   ```
+   scripts/rnbd/receipts/2026-06-26-rnbd-receipt.pdf
+   ```
+2. Upload to the immutable S3 bucket:
+   ```
+   bash scripts/rnbd/upload-receipt.sh scripts/rnbd/receipts/2026-06-26-rnbd-receipt.pdf
+   ```
+3. The script will Object-Lock the file (COMPLIANCE mode, 7y retention).
+4. After successful upload, the local PDF copy can be deleted — the
+   authoritative artifact is the S3 object.
+
+## What's in the receipts
+
+- **Initial RNBD registration** (Ley 1581/2012 Art. 25 + Decreto 1377/2013
+  Art. 42) — the proof we are registered as a database operator.
+- **Annual RNBD update** (Decreto 1377/2013 Art. 43, due 2 Jan – 31 Mar
+  each year) — proves we kept the registration current.
+- **Re-certificaciones** — if Opita Code changes its razón social or
+  address, we re-certify; the new receipt is appended here.
+
+## Local copies — operator convenience only
+
+The local PDFs in this directory are convenience copies for the DPO.
+They are NOT the authoritative artifact. If this directory is wiped,
+nothing is lost: the S3 Object Lock guarantees immutability.

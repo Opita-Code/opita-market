@@ -1,0 +1,38 @@
+{
+  "name": "@opita-market/pagos-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "description": "Opita Pagos — multi-channel payment orchestration (Wompi Bre-B + cards), closed-loop wallet with COP-pegged virtual balance, anti-fraud engine, anti-chargeback escrow, and Tier 0-4 KYC-aware limits.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1075.0",
+    "@aws-sdk/client-secrets-manager": "^3.1075.0",
+    "@aws-sdk/client-ses": "^3.1075.0",
+    "@aws-sdk/client-sns": "^3.1075.0",
+    "@aws-sdk/lib-dynamodb": "^3.1075.0",
+    "@maxmind/geoip2-node": "^3.1.1",
+    "@opita-market/compliance-service": "*",
+    "hono": "^4.12.27",
+    "ip2proxy-nodejs": "^4.5.0",
+    "jose": "^5.6.3",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.20.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "aws-sdk-client-mock": "^4.1.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
