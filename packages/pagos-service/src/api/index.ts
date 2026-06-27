@@ -147,7 +147,20 @@ export function createApp(): Hono {
 
   // Auth middleware FIRST — unauthenticated requests get 401 before CSRF check.
   // CSRF only protects authenticated sessions from cross-site forgery.
-  app.use("/v1/*", authMiddleware);
+  //
+  // PR 11 (closes R2-001): /v1/payments/webhook is a path-aware bypass
+  // because Wompi's webhook uses HMAC signature, NOT JWT. The route-level
+  // webhookIpAllowlist middleware enforces source-IP allowlist + per-IP
+  // rate limit, then the route handler verifies the HMAC signature. Bypassing
+  // the JWT auth here lets the IP allowlist run as designed (defense-in-depth).
+  // The CSRF middleware also bypasses this path (PR 6) since Wompi doesn't
+  // send cookies.
+  app.use("/v1/*", async (c, next) => {
+    if (c.req.path === "/v1/payments/webhook") {
+      return next();
+    }
+    return authMiddleware(c, next);
+  });
 
   // PR 6 — CSRF middleware (closes MW-FE-005 backend loop)
   // Applied AFTER auth so only authenticated state-mutating requests are validated.
