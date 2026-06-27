@@ -71,32 +71,24 @@ function readCurrentValue() {
 }
 
 function setNewValue(value) {
-  // Use spawnSync with all stdio piped so we can capture + log stderr.
-  // Pipe the new value via stdin (avoids shell-quoting + process listing leak).
-  const proc = spawnSync(
-    "npx",
-    ["sst", "secret", "set", SECRET_NAME, "--stage", STAGE],
-    {
+  // Use execSync (NOT spawnSync) — same pattern as scripts/setup-wompi-secrets.mjs
+  // which is known to work. Pipe value via stdin to avoid shell-quoting + process listing leak.
+  try {
+    execSync(`npx sst secret set ${SECRET_NAME} --stage ${STAGE}`, {
       input: value,
-      stdio: ["pipe", "pipe", "pipe"],
       encoding: "utf8",
-    },
-  );
-  if (proc.status !== 0) {
-    // Log full output for diagnosis
-    console.error("[rotate-wompi] --- sst secret set stdout ---");
-    console.error(proc.stdout ?? "(empty)");
-    console.error("[rotate-wompi] --- sst secret set stderr ---");
-    console.error(proc.stderr ?? "(empty)");
-    console.error("[rotate-wompi] --- exit code:", proc.status, "---");
+      stdio: ["pipe", "inherit", "pipe"], // inherit stdout (sst prints "Updated"), pipe stderr
+    });
+  } catch (err) {
+    const stderr = err.stderr ? err.stderr.toString() : "(no stderr)";
+    console.error("[rotate-wompi] --- sst secret set failed ---");
+    console.error("Exit code:", err.status);
+    console.error("Stderr:", stderr);
     throw new Error(
-      `sst secret set failed with exit code ${proc.status}. ` +
-        `Check AWS credentials (aws sts get-caller-identity) and that ` +
-        `stage '${STAGE}' exists in SST.`,
+      `sst secret set failed with exit code ${err.status ?? "?"}. ` +
+        `Run 'npx sst secret set ${SECRET_NAME} --stage ${STAGE}' manually to see full error.`,
     );
   }
-  // sst prints "Updated secret" on success
-  return proc.stdout ?? "";
 }
 
 function readNewKey() {
