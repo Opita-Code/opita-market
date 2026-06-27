@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { requireUser } from "../lib/auth.js";
 import { AmountInvalidError } from "../lib/errors.js";
 import { getAppContext } from "./index.js";
@@ -16,16 +17,19 @@ bonuses.get("/:user/balance", async (c) => {
     return c.json({ error_code: "FORBIDDEN" }, 403);
   }
 
-  // PR 6 simplified: just return wallet balance
-  // PR 8 will sum pending bonuses not yet applied
-  const result = await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: targetUser },
-  });
+  // Read wallet balance (closes pre-existing BatchExecuteStatementCommand bug)
+  // PR 1.4c: use GetCommand instead of inline object — fixes TS2353.
+  // PR 2.x: will sum pending bonuses from Bonuses table.
+  const result = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: targetUser },
+    }),
+  );
   return c.json({
     user_id: targetUser,
     available_for_withdraw_cop: result.Item?.balance_cop ?? 0,
-    pending_coins_cop: 0, // PR 8 will sum from MarketBonuses
+    pending_coins_cop: 0, // PR 2.x will sum from Bonuses table
   });
 });
 
@@ -54,8 +58,8 @@ bonuses.post("/:user/trigger", async (c) => {
   return c.json(result);
 });
 
-// Simple in-memory bonus store for PR 6 — PR 8 wires to DynamoDB
-function makeBonusStore(ctx: any): any {
+// Simple in-memory bonus store for PR 1.4c — wired to DynamoDB Bonuses table in PR 2.x.
+function makeBonusStore(_ctx: any): any {
   return {
     getLastBonus: async () => null,
     recordBonus: async () => {},

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { GetCommand, UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { requireUser } from "../lib/auth.js";
 import { InvalidStateError, InsufficientBalanceError, AmountInvalidError, WithdrawHoldNotElapsedError, TierLimitExceededError } from "../lib/errors.js";
 import { getAppContext } from "./index.js";
@@ -14,14 +15,15 @@ wallet.get("/:user/balance", async (c) => {
   const ctx = getAppContext();
   const targetUser = c.req.param("user");
   if (targetUser !== user.email && !user.groups.includes("dpo")) {
-    // users can only see their own balance (DPO can see anyone)
     throw new InvalidStateError("Cannot view another user's balance");
   }
 
-  const result = await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: targetUser },
-  });
+  const result = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: targetUser },
+    }),
+  );
 
   const item = result.Item;
   if (!item) {
@@ -58,15 +60,12 @@ wallet.get("/:user/balance", async (c) => {
 });
 
 // ─── POST /v1/wallet/:user/topup ────────────────────────────────────────────
-// Self-purchase intent to add to own wallet (recharges via Wompi)
 
 wallet.post("/:user/topup", async (c) => {
   const user = requireUser(c);
   const ctx = getAppContext();
   const targetUser = c.req.param("user");
   if (targetUser !== user.email) throw new InvalidStateError("Cannot topup another user");
-  // Topup is just a special payment intent — reuse /payments/intent
-  // PR 6 simplified: redirect via idempotent logic
   const body = await c.req.json().catch(() => ({}));
   return c.json({
     transaction_id: `tx-${randomUUID()}`,
@@ -79,7 +78,6 @@ wallet.post("/:user/topup", async (c) => {
 });
 
 // ─── POST /v1/wallet/:user/withdraw ────────────────────────────────────────
-// Withdrawal to Bre-B
 
 wallet.post("/:user/withdraw", async (c) => {
   const user = requireUser(c);
@@ -96,15 +94,17 @@ wallet.post("/:user/withdraw", async (c) => {
   }
   if (!phone) throw new AmountInvalidError("destination.phone is required");
 
-  const result = await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: targetUser },
-  });
-  const wallet = result.Item;
-  const balance = wallet?.balance_cop ?? 0;
-  const rawTier = wallet?.tier;
+  const result = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: targetUser },
+    }),
+  );
+  const w = result.Item;
+  const balance = w?.balance_cop ?? 0;
+  const rawTier = w?.tier;
   const tier: Tier = isValidTier(rawTier) ? rawTier : 0;
-  const lifetimeWithdrawn = wallet?.lifetime_withdrawn_cop ?? 0;
+  const lifetimeWithdrawn = w?.lifetime_withdrawn_cop ?? 0;
 
   if (balance < amount) {
     throw new InsufficientBalanceError(`Insufficient balance: ${balance} < ${amount}`, balance, amount);
@@ -120,11 +120,8 @@ wallet.post("/:user/withdraw", async (c) => {
     );
   }
 
-  // Check withdrawal hold
   const holdHours = withdrawHoldFor(tier, amount);
   if (holdHours > 0) {
-    // For PR 6 simplified: assume all recent deposits are within hold (worst case)
-    // PR 8 will track per-deposit timestamps for precise hold calculation
     const availableAt = new Date(Date.now() + holdHours * 60 * 60 * 1000).toISOString();
     throw new WithdrawHoldNotElapsedError(
       `Hold not elapsed; available at ${availableAt}`,
@@ -137,7 +134,7 @@ wallet.post("/:user/withdraw", async (c) => {
     throw new InvalidStateError("Payouts are paused (emergency kill-switch active)");
   }
 
-  // PR 6 simplified: PR 8 will call Wompi API to actually disburse
+  // PR 2.x: use transactDebitWallet from PR 1.2 (closes OPL-API-011 race + OPL-LIB-002 TOCTOU)
   return c.json({
     withdrawal_id: `wd-${randomUUID()}`,
     status: "PROCESSING",
@@ -162,55 +159,62 @@ wallet.post("/:user/transfer", async (c) => {
     throw new AmountInvalidError("amount_cop must be a positive integer");
   }
 
-  // Atomic: decrement from sender, credit to recipient
-  // PR 6 simplified: separate updates; PR 8 uses TransactWriteItems for atomicity
-  const fromResult = await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: fromUserId },
-  });
+  // SECURITY: P2P transfer is currently NON-ATOMIC (separates reads + writes).
+  // Closes OPL-API-001 + OPL-CARD-003: PR 2.x uses transactP2PTransfer from PR 1.2.
+  const fromResult = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: fromUserId },
+    }),
+  );
   const fromBalance = fromResult.Item?.balance_cop ?? 0;
   if (fromBalance < amount) {
     throw new InsufficientBalanceError(`Insufficient balance: ${fromBalance} < ${amount}`, fromBalance, amount);
   }
 
-  await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: fromUserId },
-    UpdateExpression: "SET balance_cop = balance_cop - :amt, version = version + :one, last_activity_at = :now",
-    ConditionExpression: "balance_cop >= :amt",
-    ExpressionAttributeValues: {
-      ":amt": amount, ":one": 1, ":now": new Date().toISOString(),
-    },
-  });
+  await ctx.dynamoClient.send(
+    new UpdateCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: fromUserId },
+      UpdateExpression: "SET balance_cop = balance_cop - :amt, version = version + :one, last_activity_at = :now",
+      ConditionExpression: "balance_cop >= :amt",
+      ExpressionAttributeValues: {
+        ":amt": amount, ":one": 1, ":now": new Date().toISOString(),
+      },
+    }),
+  );
 
-  await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: toUserId },
-    UpdateExpression: "SET balance_cop = if_not_exists(balance_cop, :zero) + :amt, version = if_not_exists(version, :zero) + :one, last_activity_at = :now",
-    ExpressionAttributeValues: {
-      ":amt": amount, ":zero": 0, ":one": 1, ":now": new Date().toISOString(),
-    },
-  });
+  await ctx.dynamoClient.send(
+    new UpdateCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: toUserId },
+      UpdateExpression: "SET balance_cop = if_not_exists(balance_cop, :zero) + :amt, version = if_not_exists(version, :zero) + :one, last_activity_at = :now",
+      ExpressionAttributeValues: {
+        ":amt": amount, ":zero": 0, ":one": 1, ":now": new Date().toISOString(),
+      },
+    }),
+  );
 
-  // Append ledger entries (debit from sender, credit to recipient)
   const ts = new Date().toISOString();
   const txId = `tx-${randomUUID()}`;
   for (const [u, m, a] of [
     [fromUserId, "TRANSFER_OUT", -amount],
     [toUserId, "TRANSFER_IN", amount],
   ] as const) {
-    await ctx.dynamoClient.send({
-      TableName: ctx.ledgerTable,
-      Item: {
-        user_id: u,
-        ts_seq: `${ts}#${randomUUID().slice(0, 6)}`,
-        movement: m,
-        amount_cop: a,
-        balance_after_cop: 0,
-        transaction_id: txId,
-        created_at: ts,
-      },
-    });
+    await ctx.dynamoClient.send(
+      new PutCommand({
+        TableName: ctx.ledgerTable,
+        Item: {
+          user_id: u,
+          ts_seq: `${ts}#${randomUUID().slice(0, 6)}`,
+          movement: m,
+          amount_cop: a,
+          balance_after_cop: 0,
+          transaction_id: txId,
+          created_at: ts,
+        },
+      }),
+    );
   }
 
   return c.json({ transfer_id: txId, status: "COMPLETED" });

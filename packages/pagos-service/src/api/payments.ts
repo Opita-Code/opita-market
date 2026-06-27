@@ -9,9 +9,10 @@
 
 import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { requireUser, requireDpo } from "../lib/auth.js";
 import { verifyWebhookSignature, generateIntegritySignature } from "../lib/wompi.js";
-import { processWompiWebhook, type WebhookGatewayDeps } from "../lib/webhook-gateway/index.js";
+import { processWompiWebhook } from "../lib/webhook-gateway/index.js";
 import { FraudEngine } from "../lib/fraud.js";
 import { TierLimitExceededError, InvalidSignatureError, AmountInvalidError, ChannelNotAllowedError, FraudBlockedError, InvalidStateError } from "../lib/errors.js";
 import { TIERS, requires3DS, isValidTier, type Tier } from "../lib/tiers.js";
@@ -92,27 +93,29 @@ payments.post("/intent", async (c) => {
     integritySecret: ctx.wompiIntegritySecret,
   });
 
-  await ctx.dynamoClient.send({
-    TableName: ctx.transactionsTable,
-    Item: {
-      transaction_id: transactionId,
-      intent: "PAYMENT",
-      channel,
-      status: "PENDING",
-      amount_cop: amount,
-      reference,
-      idempotency_key: idempotencyKey,
-      idempotency_key_hash: idempotencyKeyHash,
-      from_user_id: fromUserId,
-      to_user_id: toUserId,
-      product_context: productContext,
-      escrow_state: "NONE",
-      fraud_signals: fraud.signals.map((s) => s.type),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      version: 1,
-    },
-  });
+  await ctx.dynamoClient.send(
+    new PutCommand({
+      TableName: ctx.transactionsTable,
+      Item: {
+        transaction_id: transactionId,
+        intent: "PAYMENT",
+        channel,
+        status: "PENDING",
+        amount_cop: amount,
+        reference,
+        idempotency_key: idempotencyKey,
+        idempotency_key_hash: idempotencyKeyHash,
+        from_user_id: fromUserId,
+        to_user_id: toUserId,
+        product_context: productContext,
+        escrow_state: "NONE",
+        fraud_signals: fraud.signals.map((s) => s.type),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        version: 1,
+      },
+    }),
+  );
 
   return c.json({
     transaction_id: transactionId,
@@ -178,16 +181,18 @@ payments.post("/:id/refund", async (c) => {
   if (tx.status === "REFUNDED") throw new InvalidStateError("Already refunded");
   if (tx.status !== "APPROVED") throw new InvalidStateError("Cannot refund unapproved tx");
 
-  await ctx.dynamoClient.send({
-    TableName: ctx.transactionsTable,
-    Key: { transaction_id: txId },
-    UpdateExpression: "SET #s = :refunded, updated_at = :now",
-    ExpressionAttributeNames: { "#s": "status" },
-    ExpressionAttributeValues: {
-      ":refunded": "REFUNDED",
-      ":now": new Date().toISOString(),
-    },
-  });
+  await ctx.dynamoClient.send(
+    new UpdateCommand({
+      TableName: ctx.transactionsTable,
+      Key: { transaction_id: txId },
+      UpdateExpression: "SET #s = :refunded, updated_at = :now",
+      ExpressionAttributeNames: { "#s": "status" },
+      ExpressionAttributeValues: {
+        ":refunded": "REFUNDED",
+        ":now": new Date().toISOString(),
+      },
+    }),
+  );
 
   // PR 6 simplified: PR 8 will call Wompi refund API + reverse bonuses
   return c.json({ refund_id: txId, status: "PROCESSING" });
@@ -211,15 +216,17 @@ payments.post("/:id/dispute", async (c) => {
     throw new InvalidStateError("Dispute window closed");
   }
 
-  await ctx.dynamoClient.send({
-    TableName: ctx.transactionsTable,
-    Key: { transaction_id: txId },
-    UpdateExpression: "SET escrow_state = :disputed, updated_at = :now",
-    ExpressionAttributeValues: {
-      ":disputed": "DISPUTED",
-      ":now": new Date().toISOString(),
-    },
-  });
+  await ctx.dynamoClient.send(
+    new UpdateCommand({
+      TableName: ctx.transactionsTable,
+      Key: { transaction_id: txId },
+      UpdateExpression: "SET escrow_state = :disputed, updated_at = :now",
+      ExpressionAttributeValues: {
+        ":disputed": "DISPUTED",
+        ":now": new Date().toISOString(),
+      },
+    }),
+  );
 
   return c.json({
     dispute_id: txId,
@@ -231,29 +238,35 @@ payments.post("/:id/dispute", async (c) => {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 async function lookupByIdempotencyKey(ctx: AppContext, hash: string): Promise<any | null> {
-  const result = await ctx.dynamoClient.send({
-    TableName: ctx.transactionsTable,
-    IndexName: "IdempotencyKeyIndex",
-    KeyConditionExpression: "idempotency_key_hash = :h",
-    ExpressionAttributeValues: { ":h": hash },
-    Limit: 1,
-  });
+  const result = await ctx.dynamoClient.send(
+    new QueryCommand({
+      TableName: ctx.transactionsTable,
+      IndexName: "IdempotencyKeyIndex",
+      KeyConditionExpression: "idempotency_key_hash = :h",
+      ExpressionAttributeValues: { ":h": hash },
+      Limit: 1,
+    }),
+  );
   return result.Items?.[0] ?? null;
 }
 
 async function lookupTransaction(ctx: AppContext, txId: string): Promise<any | null> {
-  const result = await ctx.dynamoClient.send({
-    TableName: ctx.transactionsTable,
-    Key: { transaction_id: txId },
-  });
+  const result = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.transactionsTable,
+      Key: { transaction_id: txId },
+    }),
+  );
   return result.Item ?? null;
 }
 
 async function lookupWallet(ctx: AppContext, userId: string): Promise<any | null> {
-  const result = await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: userId },
-  });
+  const result = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: userId },
+    }),
+  );
   return result.Item ?? null;
 }
 
@@ -265,10 +278,12 @@ async function runFraudChecks(
   _amount: number,
 ): Promise<{ decision: "ALLOW" | "REVIEW" | "BLOCK"; signals: Array<{ type: string; weight: number }> }> {
   const ip = user.ip ?? "0.0.0.0";
-  const geo = await ctx.dynamoClient.send({
-    TableName: ctx.ipGeoCacheTable,
-    Key: { ip },
-  }).then((r: any) => r.Item).catch(() => null);
+  const geo = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.ipGeoCacheTable,
+      Key: { ip },
+    }),
+  ).then((r: any) => r.Item).catch(() => null);
 
   const engine = new FraudEngine();
   const signals = geo ? engine.evaluateSignals([

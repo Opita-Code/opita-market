@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { requireUser, requireDpo } from "../lib/auth.js";
 import { MissingRequirementsError, InvalidStateError } from "../lib/errors.js";
 import { TIERS, canPromoteTo, isValidTier, type Tier } from "../lib/tiers.js";
@@ -16,10 +17,12 @@ tier.get("/:user", async (c) => {
     throw new InvalidStateError("Cannot view another user's tier");
   }
 
-  const result = await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: targetUser },
-  });
+  const result = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: targetUser },
+    }),
+  );
   const wallet = result.Item;
   const rawTier = wallet?.tier;
   const currentTier: Tier = isValidTier(rawTier) ? rawTier : 0;
@@ -31,11 +34,10 @@ tier.get("/:user", async (c) => {
   let progress: any = null;
   if (nextTier) {
     const next = TIERS[nextTier];
-    // PR 6 simplified: assume all requirements are unverified (operator verifies per-flow)
     const unmet = next.requirements;
     progress = {
       target_tier: nextTier,
-      unmet_requirements: unmet, // operator verifies each one
+      unmet_requirements: unmet,
       next_tier_benefits: [
         `Receive limit: ${formatCop(next.receiveLimitDayCop)}/day`,
         `Withdraw limit: ${formatCop(next.withdrawLimitDayCop)}/day`,
@@ -72,11 +74,12 @@ tier.post("/:user/promote", async (c) => {
   }
   const verifiedRequirements = new Set<string>(body?.evidence?.verified_requirements ?? []);
 
-  // Read current tier
-  const result = await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: targetUser },
-  });
+  const result = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: targetUser },
+    }),
+  );
   const currentTier = isValidTier(result.Item?.tier) ? result.Item.tier : 0;
 
   if (!canPromoteTo(currentTier, targetTier, verifiedRequirements)) {
@@ -87,15 +90,17 @@ tier.post("/:user/promote", async (c) => {
     );
   }
 
-  await ctx.dynamoClient.send({
-    TableName: ctx.walletsTable,
-    Key: { user_id: targetUser },
-    UpdateExpression: "SET tier = :t, updated_at = :now",
-    ExpressionAttributeValues: {
-      ":t": targetTier,
-      ":now": new Date().toISOString(),
-    },
-  });
+  await ctx.dynamoClient.send(
+    new UpdateCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: targetUser },
+      UpdateExpression: "SET tier = :t, updated_at = :now",
+      ExpressionAttributeValues: {
+        ":t": targetTier,
+        ":now": new Date().toISOString(),
+      },
+    }),
+  );
 
   return c.json({
     tier: targetTier,
