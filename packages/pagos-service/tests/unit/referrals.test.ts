@@ -4,13 +4,23 @@ import {
   type ReferralStore,
   type AntiFraudContext,
 } from "../../src/lib/referrals.js";
+import { InMemoryReferralMonthlyCounter } from "../../src/lib/referral-monthly-counter.js";
 import type { ReferralStatus } from "../../src/db/tables.js";
+import {
+  DeviceDuplicateError,
+  InvalidReferralCodeError,
+  IpDuplicateError,
+  SelfReferralError,
+} from "../../src/lib/errors.js";
 
 /**
  * Tests for ReferralEngine — referral code generation, qualification,
  * anti-fraud (self/IP/device duplicate), bonus firing.
  *
- * Decoupled from DynamoDB via ReferralStore (mocked here).
+ * PR 2e update:
+ *   - ReferralEngine requires monthlyCounter dep (closes OPL-LIB-009)
+ *   - ReferralEngine requires anti-fraud context (closes OPL-CARD-010)
+ *   - Errors are typed (not ad-hoc Error with .code string)
  */
 
 class FakeReferralStore implements ReferralStore {
@@ -25,7 +35,7 @@ class FakeReferralStore implements ReferralStore {
     reject_reason?: string;
     created_at: string;
   }> = [];
-  private userCodes = new Map<string, string>(); // userId → code
+  private userCodes = new Map<string, string>();
 
   async getUserByCode(code: string): Promise<string | null> {
     for (const [uid, c] of this.userCodes.entries()) {
@@ -67,17 +77,23 @@ class FakeReferralStore implements ReferralStore {
     }
   }
 
-  async reverseReferralBonusesForTransaction(transactionId: string): Promise<number> {
-    return 0; // stub for PR 4 — real impl in PR 6
+  async reverseReferralBonusesForTransaction(_transactionId: string): Promise<number> {
+    return 0;
   }
 
-  // Test helpers
   all() { return this.referrals; }
   reset() {
     this.referrals = [];
     this.userCodes.clear();
   }
 }
+
+const VALID_ANTI_FRAUD: AntiFraudContext = {
+  refereeIp: "8.8.8.8",
+  refereeDeviceId: "device-A",
+  referrerIp: "1.1.1.1",
+  referrerDeviceId: "device-B",
+};
 
 describe("referrals engine", () => {
   let store: FakeReferralStore;
@@ -86,7 +102,8 @@ describe("referrals engine", () => {
 
   beforeEach(async () => {
     store = new FakeReferralStore();
-    engine = new ReferralEngine({ store });
+    const monthlyCounter = new InMemoryReferralMonthlyCounter();
+    engine = new ReferralEngine({ store, monthlyCounter });
     referrerCode = await engine.generateCode("referrer-1");
   });
 
@@ -120,94 +137,83 @@ describe("referrals engine", () => {
   });
 
   describe("acceptCode", () => {
-    it("creates PENDING referral when valid code is accepted", async () => {
-      const result = await engine.acceptCode("referee-1", referrerCode);
+    it("creates PENDING referral when valid code is accepted (with anti-fraud)", async () => {
+      const result = await engine.acceptCode("referee-1", referrerCode, VALID_ANTI_FRAUD);
       expect(result.status).toBe("PENDING");
       expect(result.referrerUserId).toBe("referrer-1");
       expect(store.all()).toHaveLength(1);
     });
 
-    it("rejects invalid code (no referrer found)", async () => {
-      try {
-        await engine.acceptCode("referee-1", "INVALID");
-        expect.fail("should have thrown");
-      } catch (e) {
-        expect((e as Error & { code?: string }).code).toBe("INVALID_CODE");
-      }
+    it("rejects invalid code (no referrer found) via typed InvalidReferralCodeError", async () => {
+      await expect(
+        engine.acceptCode("referee-1", "INVALID", VALID_ANTI_FRAUD),
+      ).rejects.toThrow(InvalidReferralCodeError);
     });
 
-    it("rejects self-referral (same user)", async () => {
+    it("rejects self-referral (same user) via typed SelfReferralError", async () => {
       const selfCode = await engine.generateCode("user-self");
-      try {
-        await engine.acceptCode("user-self", selfCode);
-        expect.fail("should have thrown");
-      } catch (e) {
-        expect((e as Error & { code?: string }).code).toBe("SELF_REFERRAL");
-      }
+      await expect(
+        engine.acceptCode("user-self", selfCode, VALID_ANTI_FRAUD),
+      ).rejects.toThrow(SelfReferralError);
     });
 
     it("rejects duplicate referral (same referee + referrer)", async () => {
-      await engine.acceptCode("referee-1", referrerCode);
+      await engine.acceptCode("referee-dup-1", referrerCode, VALID_ANTI_FRAUD);
       await expect(
-        engine.acceptCode("referee-1", referrerCode),
+        engine.acceptCode("referee-dup-1", referrerCode, VALID_ANTI_FRAUD),
       ).rejects.toThrow();
     });
 
-    it("rejects IP duplicate (referrer + referee share IP)", async () => {
+    it("rejects IP duplicate (referrer + referee share IP) via typed IpDuplicateError", async () => {
       const antiFraud: AntiFraudContext = {
         refereeIp: "1.2.3.4",
         refereeDeviceId: "device-A",
         referrerIp: "1.2.3.4",
         referrerDeviceId: "device-B",
       };
-      try {
-        await engine.acceptCode("referee-1", referrerCode, antiFraud);
-        expect.fail("should have thrown");
-      } catch (e) {
-        expect((e as Error & { code?: string }).code).toBe("IP_DUPLICATE");
-      }
+      await expect(
+        engine.acceptCode("referee-ip-1", referrerCode, antiFraud),
+      ).rejects.toThrow(IpDuplicateError);
     });
 
-    it("rejects device duplicate (same device_id)", async () => {
+    it("rejects device duplicate (referrer + referee share device) via typed DeviceDuplicateError", async () => {
       const antiFraud: AntiFraudContext = {
-        refereeIp: "5.6.7.8",
-        refereeDeviceId: "device-X",
-        referrerIp: "9.10.11.12",
-        referrerDeviceId: "device-X",
+        refereeIp: "8.8.8.8",
+        refereeDeviceId: "same-device",
+        referrerIp: "1.1.1.1",
+        referrerDeviceId: "same-device",
       };
-      try {
-        await engine.acceptCode("referee-1", referrerCode, antiFraud);
-        expect.fail("should have thrown");
-      } catch (e) {
-        expect((e as Error & { code?: string }).code).toBe("DEVICE_DUPLICATE");
-      }
+      await expect(
+        engine.acceptCode("referee-dev-1", referrerCode, antiFraud),
+      ).rejects.toThrow(DeviceDuplicateError);
     });
 
-    it("allows referral when no anti-fraud context provided (defers check)", async () => {
-      const result = await engine.acceptCode("referee-1", referrerCode);
-      expect(result.status).toBe("PENDING");
+    it("allows referral when no anti-fraud context provided → MissingAntiFraudContext (closes OPL-CARD-010)", async () => {
+      // PR 2e changed behavior: antiFraud is now REQUIRED.
+      // Previously: defer check. Now: throw 400.
+      await expect(
+        engine.acceptCode("referee-noaf", referrerCode),
+      ).rejects.toThrow(/anti-?fraud/i);
     });
   });
 
   describe("qualifyOnAction", () => {
-    beforeEach(async () => {
-      await engine.acceptCode("referee-1", referrerCode);
-    });
-
     it("sets status QUALIFIED on first purchase", async () => {
+      await engine.acceptCode("referee-qp-1", referrerCode, VALID_ANTI_FRAUD);
       const result = await engine.qualifyOnAction({
-        refereeUserId: "referee-1",
+        refereeUserId: "referee-qp-1",
         action: "FIRST_PURCHASE",
       });
       expect(result.qualified).toBe(true);
-      const referral = store.all()[0];
-      expect(referral.status).toBe("QUALIFIED");
-      expect(referral.qualified_at).toBeDefined();
+      const r = store.all()[0];
+      expect(r.status).toBe("QUALIFIED");
+      expect(r.qualified_at).toBeDefined();
     });
 
     it("sets status QUALIFIED on first incoming payment > $10k COP", async () => {
+      await engine.acceptCode("referee-qi-1", referrerCode, VALID_ANTI_FRAUD);
       const result = await engine.qualifyOnAction({
-        refereeUserId: "referee-1",
+        refereeUserId: "referee-qi-1",
         action: "FIRST_INCOMING_PAYMENT",
         amountCop: 50_000,
       });
@@ -215,23 +221,35 @@ describe("referrals engine", () => {
     });
 
     it("does NOT qualify on small incoming payment (< $10k)", async () => {
+      await engine.acceptCode("referee-qs-1", referrerCode, VALID_ANTI_FRAUD);
       const result = await engine.qualifyOnAction({
-        refereeUserId: "referee-1",
+        refereeUserId: "referee-qs-1",
         action: "FIRST_INCOMING_PAYMENT",
         amountCop: 5_000,
       });
       expect(result.qualified).toBe(false);
+      expect(result.reason).toBe("AMOUNT_BELOW_THRESHOLD");
     });
 
     it("is idempotent (qualifying twice does not re-fire)", async () => {
-      await engine.qualifyOnAction({ refereeUserId: "referee-1", action: "FIRST_PURCHASE" });
-      const second = await engine.qualifyOnAction({ refereeUserId: "referee-1", action: "FIRST_PURCHASE" });
-      expect(second.qualified).toBe(false);
+      await engine.acceptCode("referee-qi-2", referrerCode, VALID_ANTI_FRAUD);
+      const r1 = await engine.qualifyOnAction({
+        refereeUserId: "referee-qi-2",
+        action: "FIRST_PURCHASE",
+      });
+      expect(r1.qualified).toBe(true);
+
+      const r2 = await engine.qualifyOnAction({
+        refereeUserId: "referee-qi-2",
+        action: "FIRST_PURCHASE",
+      });
+      expect(r2.qualified).toBe(false);
+      expect(r2.alreadyQualified).toBe(true);
     });
 
     it("returns NOT_QUALIFIED when no PENDING referral exists for referee", async () => {
       const result = await engine.qualifyOnAction({
-        refereeUserId: "unknown-user",
+        refereeUserId: "no-referral-user",
         action: "FIRST_PURCHASE",
       });
       expect(result.qualified).toBe(false);
@@ -240,26 +258,38 @@ describe("referrals engine", () => {
   });
 
   describe("qualification threshold for incoming payments", () => {
-    beforeEach(async () => {
-      await engine.acceptCode("referee-1", referrerCode);
-    });
-
     it("qualifies at exactly $10k (boundary inclusive)", async () => {
+      await engine.acceptCode("referee-bdry", referrerCode, VALID_ANTI_FRAUD);
       const result = await engine.qualifyOnAction({
-        refereeUserId: "referee-1",
+        refereeUserId: "referee-bdry",
         action: "FIRST_INCOMING_PAYMENT",
         amountCop: 10_000,
       });
       expect(result.qualified).toBe(true);
     });
 
-    it("does NOT qualify at $9,999", async () => {
+    it("does NOT qualify at $9,999 (boundary exclusive)", async () => {
+      await engine.acceptCode("referee-justunder", referrerCode, VALID_ANTI_FRAUD);
       const result = await engine.qualifyOnAction({
-        refereeUserId: "referee-1",
+        refereeUserId: "referee-justunder",
         action: "FIRST_INCOMING_PAYMENT",
         amountCop: 9_999,
       });
       expect(result.qualified).toBe(false);
+    });
+  });
+
+  describe("input validation", () => {
+    it("throws on empty refereeUserId", async () => {
+      await expect(
+        engine.acceptCode("", "ANYCODE", VALID_ANTI_FRAUD),
+      ).rejects.toThrow();
+    });
+
+    it("throws on empty code", async () => {
+      await expect(
+        engine.acceptCode("user-1", "", VALID_ANTI_FRAUD),
+      ).rejects.toThrow();
     });
   });
 });

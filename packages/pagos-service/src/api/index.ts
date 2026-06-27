@@ -27,6 +27,8 @@ import {
 } from "../lib/velocity/index.js";
 import { DynamoBonusDailyCounter } from "../lib/bonus-daily-counter-dynamo.js";
 import type { BonusDailyCounter } from "../lib/bonus-daily-counter.js";
+import { DynamoReferralMonthlyCounter } from "../lib/referral-monthly-counter-dynamo.js";
+import type { ReferralMonthlyCounter } from "../lib/referral-monthly-counter.js";
 import { payments } from "./payments.js";
 import { wallet } from "./wallet.js";
 import { tier } from "./tier.js";
@@ -82,6 +84,8 @@ export interface AppContext {
   userHistory: UserHistory;
   // PR 2d — Bonus daily counter (closes OPL-LIB-003, OPL-CARD-011)
   bonusDailyCounter: BonusDailyCounter;
+  // PR 2e — Referral monthly counter (closes OPL-LIB-009)
+  referralMonthlyCounter: ReferralMonthlyCounter;
 }
 
 let appContext: AppContext | null = null;
@@ -138,6 +142,7 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
       VelocityCountersTable: { name: string };
       UserHistoryTable: { name: string };
       BonusDailyCounterTable: { name: string };
+      ReferralMonthlyCounterTable: { name: string };
       WompiPublicKey: { value: string };
       WompiPrivateKey: { value: string };
       WompiEventsSecret: { value: string };
@@ -181,6 +186,9 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
 
       // PR 2d — bonus daily counter (closes OPL-LIB-003, OPL-CARD-011)
       bonusDailyCounter: new DynamoBonusDailyCounter(docClient, Res.BonusDailyCounterTable.name),
+
+      // PR 2e — referral monthly counter (closes OPL-LIB-009)
+      referralMonthlyCounter: new DynamoReferralMonthlyCounter(docClient, Res.ReferralMonthlyCounterTable.name),
 
       // PR 2a — wire transact wrapper from PR 1.2 into routes
       // Closes: OPL-API-001, OPL-CARD-003, OPL-API-011, OPL-LIB-002,

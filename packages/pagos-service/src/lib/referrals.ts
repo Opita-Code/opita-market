@@ -3,11 +3,13 @@
  *
  * Two-sided bonus (referrer + referee), QUALIFIED on real action (not just signup).
  *
- * ANTI-FRAUD:
+ * ANTI-FRAUD (PR 2e):
  *   - Self-referral blocked (same user_id)
  *   - IP duplicate blocked (referrer and referee share IP)
  *   - Device fingerprint duplicate blocked (same device_id)
  *   - Duplicate referral rejected (same referee can only be referred once per referrer)
+ *   - Anti-fraud context REQUIRED (all 4 fields) — closes OPL-CARD-010
+ *   - Monthly referral cap: 10 qualified referrals per referrer — closes OPL-LIB-009
  *
  * QUALIFICATION:
  *   - First purchase by referee (any amount)
@@ -19,6 +21,17 @@
  */
 
 import type { ReferralStatus } from "../db/tables.js";
+import { type ReferralMonthlyCounter, utcMonthString } from "./referral-monthly-counter.js";
+import {
+  DeviceDuplicateError,
+  InvalidReferralCodeError,
+  IpDuplicateError,
+  MissingAntiFraudContextError,
+  MonthlyReferralLimitExceededError,
+  SelfReferralError,
+} from "./errors.js";
+
+export const MAX_REFERRALS_PER_MONTH = 10;
 
 // Code generation — exclude ambiguous characters
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 32 chars, no 0/O/1/I/L
@@ -75,6 +88,8 @@ export interface AntiFraudContext {
 
 export interface ReferralEngineDeps {
   store: ReferralStore;
+  /** PR 2e — monthly counter for cap enforcement (closes OPL-LIB-009). */
+  monthlyCounter: ReferralMonthlyCounter;
   /** Optional clock for tests. */
   now?: () => Date;
 }
@@ -92,10 +107,12 @@ export interface QualifyResult {
 
 export class ReferralEngine {
   private readonly store: ReferralStore;
+  private readonly monthlyCounter: ReferralMonthlyCounter;
   private readonly now: () => Date;
 
   constructor(deps: ReferralEngineDeps) {
     this.store = deps.store;
+    this.monthlyCounter = deps.monthlyCounter;
     this.now = deps.now ?? (() => new Date());
   }
 
@@ -128,7 +145,7 @@ export class ReferralEngine {
   /**
    * Accept a referral code on behalf of `refereeUserId`.
    * Throws on: empty input, invalid code, self-referral, duplicate referral,
-   * IP duplicate, device duplicate.
+   * IP duplicate, device duplicate, missing anti-fraud context, monthly cap exceeded.
    */
   async acceptCode(
     refereeUserId: string,
@@ -138,41 +155,39 @@ export class ReferralEngine {
     if (!refereeUserId) throw new Error("refereeUserId is required");
     if (!code) throw new Error("code is required");
 
+    // PR 2e (closes OPL-CARD-010): anti-fraud context REQUIRED.
+    // All 4 fields must be non-empty.
+    if (
+      !antiFraud ||
+      !antiFraud.refereeIp ||
+      !antiFraud.refereeDeviceId ||
+      !antiFraud.referrerIp ||
+      !antiFraud.referrerDeviceId
+    ) {
+      throw new MissingAntiFraudContextError(
+        "Anti-fraud context is required: refereeIp, refereeDeviceId, referrerIp, referrerDeviceId",
+      );
+    }
+
     // Look up referrer
     const referrerUserId = await this.store.getUserByCode(code);
     if (!referrerUserId) {
-      const err = new Error("Invalid code");
-      (err as Error & { code?: string }).code = "INVALID_CODE";
-      throw err;
+      throw new InvalidReferralCodeError();
     }
 
     // Self-referral check
     if (referrerUserId === refereeUserId) {
-      const err = new Error("Self-referral is not allowed");
-      (err as Error & { code?: string }).code = "SELF_REFERRAL";
-      throw err;
+      throw new SelfReferralError();
     }
 
     // Anti-fraud: IP duplicate
-    if (
-      antiFraud?.refereeIp &&
-      antiFraud?.referrerIp &&
-      antiFraud.refereeIp === antiFraud.referrerIp
-    ) {
-      const err = new Error("Referrer and referee share an IP address");
-      (err as Error & { code?: string }).code = "IP_DUPLICATE";
-      throw err;
+    if (antiFraud.refereeIp === antiFraud.referrerIp) {
+      throw new IpDuplicateError();
     }
 
     // Anti-fraud: device duplicate
-    if (
-      antiFraud?.refereeDeviceId &&
-      antiFraud?.referrerDeviceId &&
-      antiFraud.refereeDeviceId === antiFraud.referrerDeviceId
-    ) {
-      const err = new Error("Referrer and referee share a device");
-      (err as Error & { code?: string }).code = "DEVICE_DUPLICATE";
-      throw err;
+    if (antiFraud.refereeDeviceId === antiFraud.referrerDeviceId) {
+      throw new DeviceDuplicateError();
     }
 
     // Duplicate referral check
@@ -183,6 +198,20 @@ export class ReferralEngine {
       throw err;
     }
 
+    // PR 2e (closes OPL-LIB-009): monthly cap enforcement
+    const nowMs = this.now().getTime();
+    const currentCount = await this.monthlyCounter.get({
+      referrerUserId,
+      nowMs,
+    });
+    if (currentCount >= MAX_REFERRALS_PER_MONTH) {
+      throw new MonthlyReferralLimitExceededError(
+        `Monthly referral limit exceeded (max ${MAX_REFERRALS_PER_MONTH}/month)`,
+        MAX_REFERRALS_PER_MONTH,
+        utcMonthString(nowMs),
+      );
+    }
+
     await this.store.createReferral({
       referrer_user_id: referrerUserId,
       referee_user_id: refereeUserId,
@@ -191,6 +220,9 @@ export class ReferralEngine {
       bonus_amount_cop: 0,
       created_at: this.now().toISOString(),
     });
+
+    // Increment monthly counter (after successful creation)
+    await this.monthlyCounter.add({ referrerUserId, nowMs });
 
     return { referrerUserId, status: "PENDING" };
   }
@@ -211,9 +243,12 @@ export class ReferralEngine {
 
     const referrals = await this.findReferralsByReferee(input.refereeUserId);
     const pending = referrals.find((r) => r.status === "PENDING");
+    const alreadyQualified = referrals.some((r) => r.status === "QUALIFIED");
 
     if (!pending) {
-      // Either no referral exists or already qualified — no-op.
+      if (alreadyQualified) {
+        return { qualified: false, alreadyQualified: true };
+      }
       return { qualified: false, reason: "NO_PENDING_REFERRAL" };
     }
 

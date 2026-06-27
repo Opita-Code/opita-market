@@ -11,7 +11,7 @@ export const referrals = new Hono();
 referrals.get("/code", async (c) => {
   const user = requireUser(c);
   const ctx = getAppContext();
-  const engine = new ReferralEngine({ store: makeStore(ctx) });
+  const engine = new ReferralEngine({ store: makeStore(ctx), monthlyCounter: ctx.referralMonthlyCounter });
   const code = await engine.generateCode(user.email);
   return c.json({ user_id: user.email, referral_code: code });
 });
@@ -24,7 +24,7 @@ referrals.post("/create", async (c) => {
   const body = await c.req.json();
   const code = String(body?.referral_code ?? "");
 
-  const engine = new ReferralEngine({ store: makeStore(ctx) });
+  const engine = new ReferralEngine({ store: makeStore(ctx), monthlyCounter: ctx.referralMonthlyCounter });
   try {
     const result = await engine.acceptCode(
       user.email,
@@ -41,6 +41,8 @@ referrals.post("/create", async (c) => {
     if (e.code === "SELF_REFERRAL") return c.json({ error_code: e.code }, 422);
     if (e.code === "IP_DUPLICATE") return c.json({ error_code: e.code }, 422);
     if (e.code === "DEVICE_DUPLICATE") return c.json({ error_code: e.code }, 422);
+    if (e.code === "MISSING_ANTI_FRAUD_CONTEXT") return c.json({ error_code: e.code }, 400);
+    if (e.code === "MONTHLY_REFERRAL_LIMIT_EXCEEDED") return c.json({ error_code: e.code }, 422);
     throw e;
   }
 });

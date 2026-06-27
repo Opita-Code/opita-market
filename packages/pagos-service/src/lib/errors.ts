@@ -214,6 +214,36 @@ export class DeviceDuplicateError extends OpitaPagosError {
   }
 }
 
+// PR 2e — Referral hardening (closes OPL-LIB-009, OPL-CARD-010)
+export class MissingAntiFraudContextError extends OpitaPagosError {
+  readonly code = "MISSING_ANTI_FRAUD_CONTEXT";
+  readonly httpStatus = 400;
+  constructor(message: string = "Anti-fraud context is required") {
+    super(message, false);
+  }
+}
+
+export class MonthlyReferralLimitExceededError extends OpitaPagosError {
+  readonly code = "MONTHLY_REFERRAL_LIMIT_EXCEEDED";
+  readonly httpStatus = 422;
+  constructor(
+    message: string,
+    public readonly limit: number,
+    public readonly monthIso: string,
+  ) {
+    super(message, false);
+  }
+}
+
+// PR 2e — SSRF (closes OPL-LIB-004, OPL-CARD-009)
+export class UnsafeEvidenceUrlError extends OpitaPagosError {
+  readonly code = "UNSAFE_EVIDENCE_URL";
+  readonly httpStatus = 422;
+  constructor(message: string, public readonly url: string, public readonly reason: string) {
+    super(message, false);  // do NOT expose internal URL to clients
+  }
+}
+
 // ─── Webhook errors ──────────────────────────────────────────────────────────
 
 export class InvalidSignatureError extends OpitaPagosError {

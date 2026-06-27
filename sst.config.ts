@@ -280,6 +280,20 @@ export default $config({
     });
 
     // ====================================================================
+    // PR 2e — Referral monthly counter (closes OPL-LIB-009)
+    //
+    // ReferralMonthlyCounterTable: per-referrer monthly qualified count.
+    //   pk: counter_id = `${referrer_user_id}:${YYYY-MM-UTC}`
+    //   attrs: claims_count
+    //   TTL: 35 days
+    // ====================================================================
+    const referralMonthlyCounterTable = new sst.aws.Dynamo("ReferralMonthlyCounterTable", {
+      fields: { counter_id: "string" },
+      primaryIndex: { hashKey: "counter_id" },
+      ttl: "ttl_epoch",
+    });
+
+    // ====================================================================
     // 6c. PagosAPI Lambda — REPLICATES ComplianceAPI architecture.
     //     Hybrid deploy: SST v4 Lambda with Function URL.
     //     Link: DDB tables + Wompi secrets + shared JWT secret.
@@ -306,6 +320,7 @@ export default $config({
         velocityCountersTable,
         userHistoryTable,
         bonusDailyCounterTable,
+        referralMonthlyCounterTable,
         wompiPublicKey,
         wompiPrivateKey,
         wompiEventsSecret,
@@ -393,6 +408,7 @@ export default $config({
       VelocityCountersTableName: velocityCountersTable.name,
       UserHistoryTableName: userHistoryTable.name,
       BonusDailyCounterTableName: bonusDailyCounterTable.name,
+      ReferralMonthlyCounterTableName: referralMonthlyCounterTable.name,
       MarketWebUrl: "https://market-dev.opitacode.com (Cloudflare Pages, NOT this SST stack)",
       DpoAlertsTopicArn: dpoAlertsTopic.arn,
     };

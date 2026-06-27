@@ -24,6 +24,8 @@
  */
 
 import type { EscrowState } from "../db/tables.js";
+import { isSafeUrl } from "./ssrf-guard.js";
+import { UnsafeEvidenceUrlError } from "./errors.js";
 
 export const DISPUTE_WINDOW_HOURS = 72;
 export const EVIDENCE_REQUIRED_ABOVE_COP = 1_000_000;
@@ -75,7 +77,12 @@ export interface TransitionPayload {
 
 export interface TransitionResult extends EscrowTransaction {
   /** Set when transition was rejected. Always present in result (may be undefined). */
-  error: "INVALID_TRANSITION" | "EVIDENCE_REQUIRED" | "DISPUTE_WINDOW_CLOSED" | undefined;
+  error:
+    | "INVALID_TRANSITION"
+    | "EVIDENCE_REQUIRED"
+    | "DISPUTE_WINDOW_CLOSED"
+    | "UNSAFE_EVIDENCE_URL"
+    | undefined;
 }
 
 const FULL_EVIDENCE_FIELDS: Array<keyof DeliveryEvidence> = [
@@ -168,6 +175,16 @@ export class EscrowStateMachine {
     const evidence = payload.evidence;
     if (!evidence) {
       return { ...tx, error: "EVIDENCE_REQUIRED" };
+    }
+
+    // PR 2e (closes OPL-LIB-004, OPL-CARD-009): SSRF guard on photo_url
+    // If a photo_url is provided, it MUST be a public http(s) URL — no
+    // internal IPs, no file://, no javascript:, no AWS IMDS, etc.
+    if (evidence.photo_url) {
+      const ssrfCheck = isSafeUrl(evidence.photo_url);
+      if (!ssrfCheck.safe) {
+        return { ...tx, error: "UNSAFE_EVIDENCE_URL" };
+      }
     }
 
     // For tx > $1M COP, require photo_url AND signature_png
