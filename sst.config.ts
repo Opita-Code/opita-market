@@ -167,6 +167,132 @@ export default $config({
     });
 
     // ====================================================================
+    // 6b. PagosAPI DynamoDB tables (PR 1.4b — pre-deploy-remediation).
+    //     Multi-table design (NOT single-table) per pentest OPL-PT-2026-06-26-001.
+    //     TTL on IpGeoCache (7d) + FraudSignals (30d) + ProcessedWebhooks (7d).
+    //     GSIs:
+    //       - Transactions: IdempotencyKeyIndex, WompiTxIdIndex, StatusUpdatedAtIndex
+    //       - Referrals: RefereeUserIdIndex (for qualifyOnAction)
+    // ====================================================================
+    const walletsTable = new sst.aws.Dynamo("WalletsTable", {
+      fields: { user_id: "string", balance_cop: "number", version: "number", tier: "number", updated_at: "string" },
+      primaryIndex: { hashKey: "user_id" },
+    });
+
+    const ledgerTable = new sst.aws.Dynamo("LedgerTable", {
+      fields: { user_id: "string", ts_seq: "string", amount_cop: "number", type: "string" },
+      primaryIndex: { hashKey: "user_id", rangeKey: "ts_seq" },
+    });
+
+    const transactionsTable = new sst.aws.Dynamo("TransactionsTable", {
+      fields: {
+        transaction_id: "string",
+        idempotency_key: "string",
+        wompi_tx_id: "string",
+        user_from: "string",
+        user_to: "string",
+        amount_cop: "number",
+        status: "string",
+        escrow_state: "string",
+        escrow_version: "number",
+        created_at: "string",
+        updated_at: "string",
+      },
+      primaryIndex: { hashKey: "transaction_id" },
+      globalIndexes: {
+        IdempotencyKeyIndex: { hashKey: "idempotency_key" },
+        WompiTxIdIndex: { hashKey: "wompi_tx_id" },
+        StatusUpdatedAtIndex: { hashKey: "status", rangeKey: "updated_at" },
+      },
+    });
+
+    const referralsTable = new sst.aws.Dynamo("ReferralsTable", {
+      fields: { referrer_user_id: "string", referee_user_id: "string", code: "string", status: "string", created_at: "string" },
+      primaryIndex: { hashKey: "referrer_user_id", rangeKey: "referee_user_id" },
+      globalIndexes: {
+        RefereeUserIdIndex: { hashKey: "referee_user_id" },
+        CodeIndex: { hashKey: "code" },
+      },
+    });
+
+    const bonusesTable = new sst.aws.Dynamo("BonusesTable", {
+      fields: { user_id: "string", rule_id: "string", transaction_id: "string", amount_cop: "number", claimed_at: "string" },
+      primaryIndex: { hashKey: "user_id", rangeKey: "rule_id" },
+    });
+
+    const ipGeoCacheTable = new sst.aws.Dynamo("IpGeoCacheTable", {
+      fields: { ip: "string", country_iso: "string", is_tor: "number", is_vpn: "number", ttl_epoch: "number" },
+      primaryIndex: { hashKey: "ip" },
+      ttl: "ttl_epoch",
+    });
+
+    const fraudSignalsTable = new sst.aws.Dynamo("FraudSignalsTable", {
+      fields: { signal_id: "string", user_id: "string", decision: "string", created_at: "string", ttl_epoch: "number" },
+      primaryIndex: { hashKey: "signal_id" },
+      globalIndexes: {
+        UserHistoryIndex: { hashKey: "user_id", rangeKey: "created_at" },
+      },
+      ttl: "ttl_epoch",
+    });
+
+    const processedWebhooksTable = new sst.aws.Dynamo("ProcessedWebhooksTable", {
+      fields: { event_id: "string", tx_id: "string", processed_at: "string", ttl_epoch: "number" },
+      primaryIndex: { hashKey: "event_id" },
+      ttl: "ttl_epoch",
+    });
+
+    // ====================================================================
+    // 6c. PagosAPI Lambda — REPLICATES ComplianceAPI architecture.
+    //     Hybrid deploy: SST v4 Lambda with Function URL.
+    //     Link: DDB tables + Wompi secrets + shared JWT secret.
+    //     Env: feature flags (R-014 of pre-deploy-remediation) for
+    //           safe rollback of the new gateways.
+    //     Memory: 1024 MB (higher for HMAC SHA256 + jose JWT verify).
+    //     Reserved concurrency: 10 (protects account DoS — closes OPL-IAM-005).
+    //     Closes: OPL-IAM-003 (secrets), MW-FE-001 (auth gateway ready),
+    //             OPL-API-006 (rate limit ready).
+    // ====================================================================
+    const pagosApi = new sst.aws.Function("PagosAPI", {
+      handler: "packages/pagos-service/src/api/index.handler",
+      url: true,
+      reservedConcurrency: 10,
+      link: [
+        walletsTable,
+        ledgerTable,
+        transactionsTable,
+        referralsTable,
+        bonusesTable,
+        ipGeoCacheTable,
+        fraudSignalsTable,
+        processedWebhooksTable,
+        wompiPublicKey,
+        wompiPrivateKey,
+        wompiEventsSecret,
+        wompiIntegritySecret,
+        jwtSecret, // shared with compliance-service for cross-service auth
+      ],
+      environment: {
+        // DPO contact (used for UIAF alerts and DPO dashboard)
+        DPO_EMAILS: process.env.DPO_EMAILS ?? "Owner@opitacode.com",
+        // Feature flags (PR 1.4b of pre-deploy-remediation)
+        // Set to "true" in production AFTER Phase 1+2 fixes are validated
+        // Default "false" = use legacy per-endpoint auth (current behavior)
+        AUTH_GATEWAY_ENABLED: process.env.AUTH_GATEWAY_ENABLED ?? "false",
+        WEBHOOK_GATEWAY_ENABLED: process.env.WEBHOOK_GATEWAY_ENABLED ?? "false",
+        TRANSACT_ENABLED: process.env.TRANSACT_ENABLED ?? "false",
+        // Legacy env var bindings (for code that still reads process.env)
+        // These are sourced from SST Secrets (encrypted at rest in AWS SM)
+        COMPLIANCE_JWT_SECRET: jwtSecret.value,
+        WOMPI_PUBLIC_KEY: wompiPublicKey.value,
+        WOMPI_PRIVATE_KEY: wompiPrivateKey.value,
+        WOMPI_EVENTS_SECRET: wompiEventsSecret.value,
+        WOMPI_INTEGRITY_SECRET: wompiIntegritySecret.value,
+      },
+      timeout: "30 seconds",
+      memory: "1024 MB",
+    });
+
+    // ====================================================================
     // 8. Router — REMOVED. Cloudflare handles routing via DNS.
     //    The VibeRouter conflict is no longer an issue since MarketWeb is
     //    on Cloudflare Pages (separate from VibeRouter).
@@ -214,6 +340,15 @@ export default $config({
       NitDvArchiveBucketName: nitDvArchiveBucket.name,
       NitDvCacheTableName: nitDvCache.name,
       ComplianceApiUrl: complianceApi.url,
+      PagosApiUrl: pagosApi.url,
+      WalletsTableName: walletsTable.name,
+      LedgerTableName: ledgerTable.name,
+      TransactionsTableName: transactionsTable.name,
+      ReferralsTableName: referralsTable.name,
+      BonusesTableName: bonusesTable.name,
+      IpGeoCacheTableName: ipGeoCacheTable.name,
+      FraudSignalsTableName: fraudSignalsTable.name,
+      ProcessedWebhooksTableName: processedWebhooksTable.name,
       MarketWebUrl: "https://market-dev.opitacode.com (Cloudflare Pages, NOT this SST stack)",
       DpoAlertsTopicArn: dpoAlertsTopic.arn,
     };

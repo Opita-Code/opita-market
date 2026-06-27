@@ -3,10 +3,18 @@
  *
  * All routes are mounted under `/v1/...`. Auth is applied globally.
  * Errors are mapped via http-errors.ts.
+ *
+ * SST v4 binding pattern (mirrors packages/compliance-service/src/api/index.ts):
+ *   - Resources are bound via `link: [Resource.X, ...]` in sst.config.ts
+ *   - Resources are accessed at runtime via `Resource.X.value` / `Resource.X.name`
+ *   - We resolve them on first invocation and cache the app
  */
 
 import { Hono } from "hono";
 import { handle } from "hono/aws-lambda";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { Resource as SSTResource } from "sst";
 import { authMiddleware } from "../lib/auth.js";
 import { handleError } from "../lib/http-errors.js";
 import { payments } from "./payments.js";
@@ -26,11 +34,18 @@ export interface AppContext {
   bonusesTable: string;
   ipGeoCacheTable: string;
   fraudSignalsTable: string;
-  dynamoClient: any;
+  processedWebhooksTable: string;
+  dynamoClient: DynamoDBDocumentClient;
   wompiPublicKey: string;
   wompiIntegritySecret: string;
   wompiEventsSecret: string;
   abortFlags: { paymentPaused: boolean; payoutsPaused: boolean };
+  jwtSecret: string;
+  featureFlags: {
+    authGatewayEnabled: boolean;
+    webhookGatewayEnabled: boolean;
+    transactEnabled: boolean;
+  };
 }
 
 let appContext: AppContext | null = null;
@@ -47,10 +62,10 @@ export function getAppContext(): AppContext {
 export function createApp(): Hono {
   const app = new Hono();
 
-  // Health endpoint (no auth)
-  app.get("/health", (c) => c.json({ status: "ok", service: "pagos", ts: new Date().toISOString() }));
+  // Health endpoint (no auth) — minimal info, no service name leak
+  app.get("/health", (c) => c.json({ status: "ok" }));
 
-  // Auth middleware for everything else
+  // Auth middleware for everything else (R6: auth gateway)
   app.use("/v1/*", authMiddleware);
 
   // Mount route modules
@@ -69,11 +84,59 @@ export function createApp(): Hono {
 }
 
 /** AWS Lambda entry point — called by SST. */
-let _cachedHandler: any = null;
-export const handler = async (event: any, context: any) => {
+let _cachedHandler: ReturnType<typeof handle> | null = null;
+export const handler = async (event: unknown, context: unknown): Promise<unknown> => {
   if (!_cachedHandler) {
+    // Resolve SST-linked resources on first invocation.
+    // In sst dev, Resource values come from the local simulator.
+    // In sst deploy, Resource values come from AWS (Secrets Manager + DDB).
+    type LinkedResources = {
+      WalletsTable: { name: string };
+      LedgerTable: { name: string };
+      TransactionsTable: { name: string };
+      ReferralsTable: { name: string };
+      BonusesTable: { name: string };
+      IpGeoCacheTable: { name: string };
+      FraudSignalsTable: { name: string };
+      ProcessedWebhooksTable: { name: string };
+      WompiPublicKey: { value: string };
+      WompiPrivateKey: { value: string };
+      WompiEventsSecret: { value: string };
+      WompiIntegritySecret: { value: string };
+      ComplianceJwtSecret: { value: string };
+    };
+    const Res = SSTResource as unknown as LinkedResources;
+
+    const baseClient = new DynamoDBClient({});
+    const docClient = DynamoDBDocumentClient.from(baseClient, {
+      marshallOptions: { removeUndefinedValues: true },
+    });
+
+    initApp({
+      walletsTable: Res.WalletsTable.name,
+      ledgerTable: Res.LedgerTable.name,
+      transactionsTable: Res.TransactionsTable.name,
+      referralsTable: Res.ReferralsTable.name,
+      bonusesTable: Res.BonusesTable.name,
+      ipGeoCacheTable: Res.IpGeoCacheTable.name,
+      fraudSignalsTable: Res.FraudSignalsTable.name,
+      processedWebhooksTable: Res.ProcessedWebhooksTable.name,
+      dynamoClient: docClient,
+      wompiPublicKey: Res.WompiPublicKey.value,
+      wompiIntegritySecret: Res.WompiIntegritySecret.value,
+      wompiEventsSecret: Res.WompiEventsSecret.value,
+      abortFlags: { paymentPaused: false, payoutsPaused: false },
+      jwtSecret: Res.ComplianceJwtSecret.value,
+      featureFlags: {
+        // Feature flags for safe rollback (R-014 of pre-deploy-remediation)
+        authGatewayEnabled: process.env.AUTH_GATEWAY_ENABLED === "true",
+        webhookGatewayEnabled: process.env.WEBHOOK_GATEWAY_ENABLED === "true",
+        transactEnabled: process.env.TRANSACT_ENABLED === "true",
+      },
+    });
+
     const app = createApp();
     _cachedHandler = handle(app);
   }
-  return _cachedHandler(event, context);
+  return _cachedHandler(event as Parameters<typeof _cachedHandler>[0], context as Parameters<typeof _cachedHandler>[1]);
 };

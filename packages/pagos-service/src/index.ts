@@ -1,15 +1,9 @@
 /**
  * Lambda entry point for Opita Pagos.
  *
- * This file is intentionally minimal in PR 1 (Foundation).
- * The Hono app + hono/aws-lambda handle() wrapper lands in PR 6.
- * See openspec/changes/opita-pagos-foundation/tasks.md.
+ * Re-exports the handler from src/api/index.ts which contains the full
+ * Hono application with all routes mounted under /v1/...
+ *
+ * SST v4 binding: `handler: "packages/pagos-service/src/api/index.handler"`
  */
-
-// PR 1 — Foundation. PR 6 will export: `export const handler = handle(app)`.
-export const handler = async (): Promise<{ statusCode: number; body: string }> => {
-  return {
-    statusCode: 503,
-    body: JSON.stringify({ error_code: "NOT_IMPLEMENTED", message: "PagosAPI bootstraps in PR 6" }),
-  };
-};
+export { handler } from "./api/index.js";
