@@ -20,6 +20,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "test": "npm run test --workspaces --if-present",
+    "audit:bundle": "node scripts/audit-bundle.mjs",
+    "preflight": "npm run typecheck && npm run lint && npm run test && npm run audit:bundle",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

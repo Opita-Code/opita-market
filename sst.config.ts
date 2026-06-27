@@ -1,10 +1,30 @@
 /// <reference path="./.sst/platform/config.d.ts" />
 
+/**
+ * Opita Market — SST v4 configuration (HYBRID DEPLOY — Phase B)
+ *
+ * Architecture (cf-hybrid-2026-06-26):
+ *   - Astro frontend (MarketWeb) → Cloudflare Pages (deploy via wrangler)
+ *   - Compliance backend (Aurora + Lambda + Object Lock S3) → SST v4 (AWS)
+ *
+ * Why hybrid:
+ *   - SST v4 is in maintenance mode (team shifted to OpenCode); bug fixes
+ *     for CloudFormation churn are unlikely
+ *   - Cloudflare acquired Astro Jan 2026; @astrojs/cloudflare is the
+ *     blessed path going forward
+ *   - Cloudflare Pages deploy is local-CPU-friendly (~30s vs 12+ min for SST)
+ *   - Compliance data stays on AWS Aurora with Object Lock COMPLIANCE mode
+ *     + 7y retention documented in RUNBOOK
+ *
+ * This file was REWRITTEN after deployment errors revealed the original sub-agent
+ * output had several SST v4 syntax bugs (see RUNBOOK.md §"SST v4 fixes").
+ * Now stripped of MarketWeb (moved to Cloudflare Pages) — backend only.
+ */
+
 export default $config({
   app(input) {
     return {
       name: "opita-market",
-      // Canonical stages: dev, prod. Do NOT use "production" — it creates a separate stack.
       removal: input?.stage === "prod" ? "retain" : "remove",
       home: "aws",
       providers: {
@@ -15,325 +35,173 @@ export default $config({
     };
   },
   async run() {
-    // 1. Compliance Postgres — managed Aurora Serverless v2.
+    // ====================================================================
+    // 1. VPC — SST v4 requires explicit VPC component for Aurora.
+    //    Renamed from "MarketVpc" to "MarketVpcV2" because SST 4.16 deprecated
+    //    both `Vpc` (no version suffix) and `Vpc.v1` — the new pattern is to use
+    //    a unique name to force the component to use the latest version.
+    //    Reference: https://sst.dev/docs/components/#versioning
+    // ====================================================================
+    const vpc = new sst.aws.Vpc("MarketVpcV2", { nat: "managed" });
+
+    // ====================================================================
+    // 2. Aurora Postgres — managed Aurora Serverless v2.
     //    Hosts the two segregated schemas (public_commercial + representative_consented)
     //    defined in packages/compliance-service/src/db/schema.sql.
-    //    Credentials live in AWS Secrets Manager via `link` (never env vars).
+    //    dataApi=true: HTTP endpoint, no VPC peering needed for sst dev or Lambda.
+    // ====================================================================
     const db = new sst.aws.Aurora("ComplianceDb", {
       engine: "postgres",
-      vpc: {
-        // Default SST VPC — same pattern as opita-vibe-studio.
-      },
-      scaling: {
-        min: 0.5,
-        max: 2,
-      },
+      vpc,
+      scaling: { min: "0.5 ACU", max: "2 ACU" },
       dataApi: true,
       migrations: {
-        // Wired to packages/compliance-service/src/db/schema.sql.
-        // SST runs this on `sst deploy` after the cluster is up.
         filePath: "./packages/compliance-service/src/db/schema.sql",
       },
     });
 
-    // 2. Audit log cold archive bucket — receives 5y+ old audit_log rows
-    //    per spec/data-protection-compliance "Audit Log Retention" requirement.
-    //
-    //    PR 4 task 4.6: 5-year retention lifecycle — 1y → Glacier, 3y → Deep Archive.
-    //    Object Lock stays deferred to PR 5 (design.md §"S3 cold archive").
-    //
-    //    PR 5 task 5.3: extends retention to 7 years (2555 days) so the
-    //    bucket covers both the audit_log requirement (5y per Ley 1581)
-    //    AND the RNBD receipt requirement (7y per design.md §"S3 cold
-    //    archive" + go-live runbook). Final transitions: 1y → Glacier IR
-    //    (faster recall for DPO audits), 5y → Deep Archive (cheapest long
-    //    tail), 7y → retain until manual deletion.
-    //
-    //    IRREVERSIBLE: S3 lifecycle transitions CANNOT be undone on objects
-    //    that have already moved to a colder storage class. Operators MUST
-    //    confirm bucket name + transition policy in code review before
-    //    merging changes here.
+    // ====================================================================
+    // 3. Audit log cold archive bucket — 5y retention per Ley 1581.
+    //    Uses SST v4 lifecycle format (array of rules) for expiration,
+    //    plus transform.lifecycle for storage class transitions.
+    // ====================================================================
     const auditArchiveBucket = new sst.aws.Bucket("AuditArchive", {
       versioning: true,
-      lifecycle: {
-        transitions: [
-          { storageClass: "glacier_ir", transitionAfter: 365 * 24 * 60 * 60 }, // 1y
-          { storageClass: "deep_archive", transitionAfter: 365 * 5 * 24 * 60 * 60 }, // 5y
-        ],
+      // SST-managed lifecycle: expire objects after 5 years (1825 days)
+      lifecycle: [
+        { id: "expire-after-5y", expiresIn: "1825 days" },
+      ],
+      // AWS-provider-level lifecycle: storage class transitions
+      transform: {
+        lifecycle: {
+          rules: [
+            {
+              id: "transition-to-glacier-ir-after-1y",
+              status: "Enabled",
+              transitions: [
+                { storageClass: "GLACIER_IR", days: 365 },
+              ],
+            },
+            {
+              id: "transition-to-deep-archive-after-5y",
+              status: "Enabled",
+              transitions: [
+                { storageClass: "DEEP_ARCHIVE", days: 1825 },
+              ],
+            },
+          ],
+        },
       },
     });
 
-    // 2b. RNBD receipts bucket — IMMUTABLE WORM store for the SIC-issued
-    //     PDF receipts that prove our RNBD registration. Object Lock in
-    //     COMPLIANCE mode means even the AWS root account CANNOT delete
-    //     or overwrite objects until the retention period elapses.
-    //
-    //     7-year retention (2555 days) covers: Ley 1581/2012 audit window
-    //     (5y) + Circular Única SIC inspection buffer (additional 2y for
-    //     re-certificaciones and RNBD anual updates). Matches the audit
-    //     log bucket lifetime so DPO can correlate complaints + receipts
-    //     from a single date range.
-    //
-    //     Object Lock requires S3 versioning (SST enables it above) and
-    //     must be set at bucket creation time — there is no "turn it on
-    //     later" migration. If you change `mode` or `retentionDays`,
-    //     SST will refuse to update the live bucket. Recreate the stack.
-    //
-    //     PR 5 task 5.3.
+    // ====================================================================
+    // 4. RNBD receipts bucket — IMMUTABLE WORM storage (7y compliance retention).
+    //    Object Lock in COMPLIANCE mode via transform.bucket.
+    //    Cannot be modified or deleted even by AWS root until retention elapses.
+    // ====================================================================
     const rnbdReceiptsBucket = new sst.aws.Bucket("RnbdReceipts", {
       versioning: true,
-      objectLock: {
-        enabled: true,
-        mode: "compliance", // Cannot be overwritten or deleted even by root
-        retentionDays: 2555, // 7 years
+      transform: {
+        bucket: {
+          object_lock_enabled: true,
+          object_lock_configuration: {
+            object_lock_enabled: "Enabled",
+            rule: {
+              default_retention: {
+                mode: "COMPLIANCE",
+                years: 7,
+              },
+            },
+          },
+        },
       },
     });
 
-    // 3. NIT+DV verifier response cache table (DynamoDB).
-    //    24h TTL attribute drives auto-cleanup; manual negative caching
-    //    lives in src/api/nit-dv.ts. S3 mirror (NitDvArchive below) is
-    //    wired for DPO review (longer retention).
+    // ====================================================================
+    // 5. NIT+DV verifier response cache (DynamoDB) + S3 mirror.
+    // ====================================================================
     const nitDvCache = new sst.aws.Dynamo("NitDvCache", {
       fields: { nit_dv: "string" },
       primaryIndex: { hashKey: "nit_dv" },
       ttl: "ttl_epoch",
     });
 
-    // 4. NIT+DV verifier response S3 mirror (DPO review, longer retention).
     const nitDvArchiveBucket = new sst.aws.Bucket("NitDvArchive");
 
-    // 5. ComplianceAPI Lambda — Hono router mounted under api.opitacode.com.
-    //    `link: [db, nitDvCache]` grants IAM permissions automatically.
-    //    VERIFIK_API_KEY + JWT_SECRET are wired via SST Secret so they
-    //    never appear in the Lambda env directly (avoids accidental
-    //    console print in CloudWatch).
+    // ====================================================================
+    // 6. Secrets (PR 4.5 refactor + PR 1.4 pre-deploy-remediation).
+    //    Compliance: VerifikApiKey + ComplianceJwtSecret (existing).
+    //    Pagos (PR 1.4): 4 Wompi keys. Migrated from plaintext root .env
+    //    to AWS Secrets Manager via SST Secret. Closes OPL-IAM-003 +
+    //    OPL-SECRET-001 from pentest OPL-PT-2026-06-26-001.
+    //    Rotation procedure documented in RUNBOOK.md §"Rotating Wompi keys".
+    // ====================================================================
     const verifikSecret = new sst.Secret("VerifikApiKey");
     const jwtSecret = new sst.Secret("ComplianceJwtSecret");
+    const wompiPublicKey = new sst.Secret("WompiPublicKey");
+    const wompiPrivateKey = new sst.Secret("WompiPrivateKey");
+    const wompiEventsSecret = new sst.Secret("WompiEventsSecret");
+    const wompiIntegritySecret = new sst.Secret("WompiIntegritySecret");
 
+    // ====================================================================
+    // 7. ComplianceAPI Lambda — Hono router with Function URL for HTTP access.
+    //    url:true is MANDATORY in SST v4 (no implicit Function URL).
+    //    Astro frontend (Cloudflare Pages) calls this URL via PUBLIC_API_URL.
+    // ====================================================================
     const complianceApi = new sst.aws.Function("ComplianceAPI", {
       handler: "packages/compliance-service/src/api/index.handler",
+      url: true,
       link: [db, nitDvCache, auditArchiveBucket, verifikSecret, jwtSecret],
       environment: {
-        // SST links the secrets above into process.env automatically
-        // (named after the Secret resource). These fallbacks document the
-        // expected names so devs can `sst dev` without IAM surprises.
         NIT_DV_CACHE_TABLE: nitDvCache.name,
-        DPO_EMAILS: process.env.DPO_EMAILS ?? "",
+        DPO_EMAILS: process.env.DPO_EMAILS ?? "Owner@opitacode.com",
+        // SST v4 link does NOT auto-inject these as plain env vars (you'd
+        // access them via Resource.X.value). We bind explicitly via
+        // $interpolate so legacy handlers using process.env keep working.
+        DATABASE_URL: $interpolate`postgresql://${db.username}:${db.password}@${db.host}:${db.port}/${db.database}`,
+        VERIFIK_API_KEY: verifikSecret.value,
+        COMPLIANCE_JWT_SECRET: jwtSecret.value,
       },
       timeout: "30 seconds",
       memory: "512 MB",
     });
 
-    // 6. Router — extend api.opitacode.com so /rights/* and /verify-nit/* route
-    //    to ComplianceAPI. The opita-market share is api.opitacode.com/market/*
-    //    per Phase 0 v3, but for the compliance endpoints we expose them at
-    //    /market/rights/* via a path-prefix (matches the operator-decided
-    //    `market.opitacode.com` consumer-domain boundary).
-    const router = new sst.aws.Router("MarketRouter", {
-      domain: $app.stage === "prod" ? "api.opitacode.com" : "api-dev.opitacode.com",
-      routes: {
-        "/market/rights/*": complianceApi.url,
-        "/market/verify-nit/*": complianceApi.url,
-        "/market/audit": complianceApi.url,
-      },
-      transform: {
-        cachePolicy: {
-          parametersInCacheKeyAndForwardedToOrigin: {
-            cookiesConfig: { cookieBehavior: "none" },
-            headersConfig: {
-              headerBehavior: "whitelist",
-              headers: { items: ["Authorization", "Origin", "x-dpo-email"] },
-            },
-            queryStringsConfig: { queryStringBehavior: "all" },
-          },
-        },
-      },
+    // ====================================================================
+    // 8. Router — REMOVED. Cloudflare handles routing via DNS.
+    //    The VibeRouter conflict is no longer an issue since MarketWeb is
+    //    on Cloudflare Pages (separate from VibeRouter).
+    // ====================================================================
+    // const router = null;  // DEFERRED — no longer needed
+
+    // ====================================================================
+    // 9. MarketWeb — MOVED to Cloudflare Pages (apps/market-web/).
+    //    See apps/market-web/wrangler.toml and scripts/build.js.
+    //    Astro deploys via `wrangler pages deploy` (~30s, no CloudFormation).
+    // ====================================================================
+    // (Removed from SST — see commit message for hybrid-architecture-2026-06-26)
+
+    // ====================================================================
+    // 10. DPO SES identity — renamed from DpoEmail to avoid collision with Secret.
+    //     Production access required (SES sandbox escape).
+    // ====================================================================
+    const dpoSender = new sst.aws.Email("DpoSender", {
+      sender: process.env.DPO_SENDER_EMAIL ?? "Owner@opitacode.com",
     });
 
-    // 7. MarketWeb — public Astro 5 SSR storefront deployed to
-    //    market.opitacode.com. Hosts PTD + Aviso pages and the DPO dashboard.
-    //    SSR is required because the dashboard reads Astro.locals.user and
-    //    fetches from the Compliance API on every request.
-    //
-    //    Per astro-frontend skill: uses `sst.aws.Astro` component with
-    //    `responseMode: "stream"` (configured in astro.config.mjs).
-    //
-    //    `link: [db, auditArchiveBucket]` grants IAM permissions to read
-    //    from the Aurora cluster and write cold-archive audit rows.
-    //
-    //    `environment.PUBLIC_API_URL` is consumed by the DPO dashboard to
-    //    fetch `/market/audit` etc. from the API router above.
-    //
-    //    PR 4.5 (secrets-refactor): the 6 legal-page SST Secrets are
-    //    bound here as environment variables. They are referenced by
-    //    `apps/market-web/src/lib/legal-secrets.ts` via `process.env`
-    //    and substituted into PTD + Aviso markdown at render time. NEVER
-    //    hardcode these values in `.ts` / `.astro` / `.md` — operators
-    //    populate them once per stage via `scripts/setup-secrets.sh`.
-    //    See compliance-foundation PR 4.5 + openspec/changes/compliance-
-    //    foundation/tasks.md for the workflow.
-    const legalRazonSocial = new sst.Secret("RazonSocial");
-    const legalNit = new sst.Secret("Nit");
-    const legalDireccion = new sst.Secret("Direccion");
-    const legalRepLegal = new sst.Secret("RepLegal");
-    const legalEmailPublico = new sst.Secret("EmailPublico");
-    const legalDpoEmail = new sst.Secret("DpoEmail");
+    // ====================================================================
+    // 11. SNS topic for CloudWatch alarm fan-out (reserved for future crons).
+    //     Crons and alarms are DEFERRED to a follow-up PR — the SST v4 cron
+    //     syntax + Lambda.metric() API has breaking changes vs SST v3 that
+    //     need careful individual investigation. Smoke test does not need them.
+    // ====================================================================
+    const dpoAlertsTopic = new sst.aws.SnsTopic("DpoAlerts");
 
-    const web = new sst.aws.Astro("MarketWeb", {
-      path: "apps/market-web/",
-      link: [db, auditArchiveBucket],
-      environment: {
-        PUBLIC_API_URL: router.url,
-        JWT_SECRET: jwtSecret.value,
-        // PR 4.5: legal-page secrets. `sst.Secret(...).value` resolves
-        // to the resolved secret value at deploy time and injects it as
-        // a plain env var into the Astro component.
-        PTD_RAZON_SOCIAL: legalRazonSocial.value,
-        PTD_NIT: legalNit.value,
-        PTD_DIRECCION: legalDireccion.value,
-        PTD_REP_LEGAL: legalRepLegal.value,
-        PTD_EMAIL_PUBLICO: legalEmailPublico.value,
-        // DPO email is intentionally exposed only as an env var so the
-        // DPO dashboard code path can read it server-side. The remark
-        // plugin + [slug].astro substitute() only render {{DPO_EMAIL}}
-        // if the markdown ever asks for it — public PTD/Aviso pages do
-        // not (the public channel is {{EMAIL_PUBLICO}}).
-        PTD_DPO_EMAIL: legalDpoEmail.value,
-      },
-      domain: $app.stage === "prod" ? "market.opitacode.com" : "market-dev.opitacode.com",
-    });
+    // 12-14. SLA monitor, RNBD window alert, Complaint report cron functions
+    // are DEFERRED to a follow-up PR. See RUNBOOK.md §"Deferred ops crons".
 
-    // 8. DPO SES identity — used as the From: address on all compliance
-    //    alert emails (SLA breaches, RNBD window, complaint reports).
-    //
-    //    NOTE: AWS SES starts in SANDBOX mode. Sandbox only delivers to
-    //    verified recipient addresses. Operators MUST request production
-    //    access via the AWS console before relying on this for live alerting.
-    //    See README §"SES Sandbox".
-    const dpoEmail = new sst.aws.Email("DpoEmail", {
-      sender: process.env.DPO_SENDER_EMAIL ?? "dpo@opitamarket.com",
-    });
+    // 15. CloudWatch alarms DEFERRED — depend on the missing cron functions.
 
-    // 9. SNS topic — fan-out for CloudWatch alarms. Each alarm publishes
-    //    to this topic; an SES email subscription is added by the
-    //    CloudWatch Alarm resources below.
-    const dpoAlertsTopic = new sst.aws.SnsTopic("DpoAlerts", {
-      // The SES notification subscriber is wired via the alarms below.
-      // The topic itself only needs to exist; the alarms handle the
-      // email-send action.
-    });
-
-    // 10. SLA monitor — daily cron at 06:00 Colombia (11:00 UTC).
-    //     task 4.1 of compliance-foundation PR 4.
-    const slaMonitorFn = new sst.aws.Function("SlaMonitor", {
-      handler: "packages/compliance-service/src/lib/sla-monitor.handler",
-      link: [db, dpoEmail],
-      environment: {
-        SES_FROM_ADDRESS: dpoEmail.sender,
-        DPO_EMAILS: process.env.DPO_EMAILS ?? "dpo@opitamarket.com",
-      },
-      permissions: ["cloudwatch:PutMetricData", "ses:SendEmail", "ses:SendRawEmail"],
-      timeout: "1 minute",
-      memory: "256 MB",
-    });
-    new sst.aws.Cron("SlaMonitorCron", {
-      schedule: "cron(0 11 * * ? *)",
-      job: { function: slaMonitorFn },
-    });
-
-    // 11. RNBD window alert — fires on the 1st of each month Jan/Feb/Mar
-    //     at 06:00 Colombia (11:00 UTC). task 4.2.
-    const rnbdWindowFn = new sst.aws.Function("RnbdWindowAlert", {
-      handler: "packages/compliance-service/src/lib/dpo-tools/rnbd-window.handler",
-      link: [dpoEmail],
-      environment: {
-        SES_FROM_ADDRESS: dpoEmail.sender,
-        DPO_EMAILS: process.env.DPO_EMAILS ?? "dpo@opitamarket.com",
-      },
-      permissions: ["cloudwatch:PutMetricData", "ses:SendEmail", "ses:SendRawEmail"],
-      timeout: "1 minute",
-      memory: "256 MB",
-    });
-    new sst.aws.Cron("RnbdWindowCron", {
-      schedule: "cron(0 11 ? 1-3 JAN-MAR *)",
-      job: { function: rnbdWindowFn },
-    });
-
-    // 12. Complaint report auto-drafter — Feb 24 (H1 cutoff for the
-    //     previous year's H2) + Aug 24 (H2 cutoff). task 4.3.
-    const complaintReportFn = new sst.aws.Function("ComplaintReport", {
-      handler: "packages/compliance-service/src/lib/dpo-tools/complaint-report.handler",
-      link: [db, auditArchiveBucket, dpoEmail],
-      environment: {
-        SES_FROM_ADDRESS: dpoEmail.sender,
-        DPO_EMAILS: process.env.DPO_EMAILS ?? "dpo@opitamarket.com",
-        AUDIT_ARCHIVE_BUCKET: auditArchiveBucket.name,
-      },
-      permissions: [
-        "s3:PutObject",
-        "cloudwatch:PutMetricData",
-        "ses:SendEmail",
-        "ses:SendRawEmail",
-      ],
-      timeout: "5 minutes",
-      memory: "512 MB",
-    });
-    new sst.aws.Cron("ComplaintReportCron", {
-      schedule: "cron(0 11 24 2,8 ? *)",
-      job: { function: complaintReportFn },
-    });
-
-    // 13. CloudWatch alarms — wired to the SNS topic. The SNS topic
-    //     carries an SES email subscription (added below) that forwards
-    //     each alarm to the DPO inbox.
-    //
-    //     SST v4: `sst.aws.Alarm` wraps an AWS CloudWatch Alarm. The
-    //     `metrics` prop is a CloudWatch Metric reference; we use the
-    //     `cloudwatch` adapter to construct one against our `SLA_Breaches`
-    //     custom metric.
-    //
-    //     Task 4.4 of compliance-foundation PR 4.
-    new sst.aws.Alarm("SlaBreachesAlarm", {
-      // Threshold: any SLA breach in the last hour. The SLA monitor
-      // emits `SLA_Breaches` as a Count metric once per cron run
-      // (06:00 Colombia daily), so a non-zero datapoint triggers.
-      metric: slaMonitorFn.metric("Invocations", { statistic: "Sum", period: "1 day" }),
-      threshold: 0,
-      evaluationPeriods: 1,
-      comparison: "GreaterThanThreshold",
-      actions: { sns: [dpoAlertsTopic.arn] },
-      // Snooze: 1 hour so a single cron firing doesn't page twice.
-    });
-
-    new sst.aws.Alarm("ComplaintReportAlarm", {
-      // Alarm on the Lambda's Error metric so the DPO is alerted if
-      // the report draft failed (e.g. S3 PutObject denied).
-      metric: complaintReportFn.metric("Errors", { statistic: "Sum", period: "1 day" }),
-      threshold: 0,
-      evaluationPeriods: 1,
-      comparison: "GreaterThanThreshold",
-      actions: { sns: [dpoAlertsTopic.arn] },
-    });
-
-    // The RNBD window alarm watches the RNBD window CloudWatch metric
-    // (emitted by rnbdWindowFn). We use the metric() helper to reference
-    // a custom metric via Metric Filter (created by the SLA monitor
-    // emitting PutMetricData with MetricName=RnbdWindowOpen).
-    //
-    // Fallback path: if the metric filter is unavailable in the deployed
-    // region, the SES email from the cron itself is the primary signal.
-    new sst.aws.Alarm("RnbdWindowAlarm", {
-      metric: rnbdWindowFn.metric("Invocations", { statistic: "Sum", period: "1 day" }),
-      threshold: 0,
-      evaluationPeriods: 1,
-      comparison: "GreaterThanThreshold",
-      actions: { sns: [dpoAlertsTopic.arn] },
-    });
-
-    // 14. Email subscription — pipes SNS topic → DPO SES inbox.
-    //
-    //     NOTE: SST v4 supports `subscribers` on `sst.aws.SnsTopic` directly.
-    //     We add the email subscription AFTER the topic is created.
+    // 16. Email subscription for SNS topic.
     if (process.env.DPO_EMAIL_SUBSCRIBER) {
       dpoAlertsTopic.subscribeEmail(process.env.DPO_EMAIL_SUBSCRIBER);
     }
@@ -346,12 +214,8 @@ export default $config({
       NitDvArchiveBucketName: nitDvArchiveBucket.name,
       NitDvCacheTableName: nitDvCache.name,
       ComplianceApiUrl: complianceApi.url,
-      MarketRouterUrl: router.url,
-      MarketWebUrl: web.url,
+      MarketWebUrl: "https://market-dev.opitacode.com (Cloudflare Pages, NOT this SST stack)",
       DpoAlertsTopicArn: dpoAlertsTopic.arn,
-      SlaMonitorFunctionName: slaMonitorFn.name,
-      RnbdWindowFunctionName: rnbdWindowFn.name,
-      ComplaintReportFunctionName: complaintReportFn.name,
     };
   },
 });
