@@ -17,6 +17,7 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { Resource as SSTResource } from "sst";
 import { authMiddleware } from "../lib/auth.js";
 import { handleError } from "../lib/http-errors.js";
+import { DynamoReplayStore } from "../lib/replay-store/dynamo.js";
 import { payments } from "./payments.js";
 import { wallet } from "./wallet.js";
 import { tier } from "./tier.js";
@@ -26,6 +27,18 @@ import { delivery } from "./delivery.js";
 import { emergency } from "./emergency.js";
 
 /** Module-level singletons (initialized by initApp). */
+import type { ReplayStore } from "../lib/replay-store/index.js";
+import type {
+  EscrowMachine,
+  ThreeDsVerifier,
+  WompiClient,
+  CreditInput,
+  CreditResult,
+  EscrowTransitionInput,
+  EscrowTransitionResult,
+  ReverseBonusInput,
+} from "../lib/webhook-gateway/index.js";
+
 export interface AppContext {
   walletsTable: string;
   ledgerTable: string;
@@ -46,6 +59,15 @@ export interface AppContext {
     webhookGatewayEnabled: boolean;
     transactEnabled: boolean;
   };
+  // Webhook gateway deps (PR 1.4c — Option C)
+  replayStore: ReplayStore;
+  escrowMachine: EscrowMachine;
+  threeDsVerifier: ThreeDsVerifier;
+  wompiClient: WompiClient;
+  transactCredit: (input: CreditInput) => Promise<CreditResult>;
+  transactTransition: (input: EscrowTransitionInput) => Promise<EscrowTransitionResult>;
+  transactReverseBonus: (input: ReverseBonusInput) => Promise<void>;
+  resolveUserFromReference: (reference: string) => Promise<string | null>;
 }
 
 let appContext: AppContext | null = null;
@@ -132,6 +154,47 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
         authGatewayEnabled: process.env.AUTH_GATEWAY_ENABLED === "true",
         webhookGatewayEnabled: process.env.WEBHOOK_GATEWAY_ENABLED === "true",
         transactEnabled: process.env.TRANSACT_ENABLED === "true",
+      },
+      // Webhook gateway deps (PR 1.4c — Option C integration)
+      replayStore: new DynamoReplayStore(docClient, Res.ProcessedWebhooksTable.name),
+      // Placeholder no-op implementations for state machine + 3DS + transact
+      // (will be replaced with real implementations in PR 1.4c proper,
+      //  once bonus/escrow/wallet modules are integrated)
+      escrowMachine: {
+        async transition(_txId, _event) {
+          // PR 1.4c proper: use transactEscrowTransition from PR 1.2
+          return { txId: _txId, newState: "HELD" };
+        },
+      },
+      threeDsVerifier: {
+        async verify(_wompiTxId) {
+          // PR 1.4c proper: call Wompi API
+          return { authenticated: true, authenticationValue: "stub" };
+        },
+      },
+      wompiClient: {
+        async getTransaction(_id) {
+          // PR 1.4c proper: call Wompi API
+          return { id: _id, status: "APPROVED", payment_method: { extra: {} } };
+        },
+      },
+      transactCredit: async () => {
+        // PR 1.4c proper: use transactDebitWallet
+        throw new Error("transactCredit not yet wired — see PR 1.4c proper");
+      },
+      transactTransition: async (input) => {
+        // PR 1.4c proper: use transactEscrowTransition
+        return { txId: input.txId, fromState: input.fromState, toState: input.toState, version: 1 };
+      },
+      transactReverseBonus: async () => {
+        // PR 1.4c proper: wire to bonus engine
+        // For now this is a no-op (the webhook handler logs fraud signal if
+        // 3DS fails, but doesn't actually credit/refund until full integration)
+      },
+      resolveUserFromReference: async (_reference) => {
+        // PR 1.4c proper: lookup transactions table by reference
+        // For now: return null (no credit happens — webhook logs and returns ok)
+        return null;
       },
     });
 

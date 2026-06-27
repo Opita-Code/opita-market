@@ -11,6 +11,7 @@ import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 import { requireUser, requireDpo } from "../lib/auth.js";
 import { verifyWebhookSignature, generateIntegritySignature } from "../lib/wompi.js";
+import { processWompiWebhook, type WebhookGatewayDeps } from "../lib/webhook-gateway/index.js";
 import { FraudEngine } from "../lib/fraud.js";
 import { TierLimitExceededError, InvalidSignatureError, AmountInvalidError, ChannelNotAllowedError, FraudBlockedError, InvalidStateError } from "../lib/errors.js";
 import { TIERS, requires3DS, isValidTier, type Tier } from "../lib/tiers.js";
@@ -129,14 +130,39 @@ payments.post("/intent", async (c) => {
 
 payments.post("/webhook", async (c) => {
   const ctx = getAppContext();
+
+  // 1. Parse body (SyntaxError → 400 via global error handler)
   const body = await c.req.json();
-  verifyWebhookSignature(body, ctx.wompiEventsSecret);
 
-  const tx = body?.data?.transaction;
-  if (!tx?.id) throw new InvalidSignatureError("Missing transaction data");
+  // 2. Verify Wompi signature (R1 of webhook-gateway spec)
+  //    Generic InvalidSignatureError — no info leak
+  if (!verifyWebhookSignature(body, ctx.wompiEventsSecret)) {
+    throw new InvalidSignatureError();
+  }
 
-  // PR 6: record the webhook status (no balance credit yet — that comes in PR 8)
-  return c.json({ ok: true, tx_id: tx.id });
+  // 3. Process via webhook gateway (handles timestamp, idempotency, state machine, 3DS)
+  //    Closes: OPL-LIB-001 (replay), OPL-API-004 (idempotency), OPL-CARD-002 (state machine)
+  //    Closes: OPL-CARD-004 (3DS), OPL-LIB-007 (generic errors), OPL-DEP-001 (no more 500s)
+  const result = await processWompiWebhook(body, body?.signature?.checksum ?? "", {
+    eventsSecret: ctx.wompiEventsSecret,
+    maxAgeMs: 5 * 60 * 1000,
+    replayStore: ctx.replayStore,
+    escrowMachine: ctx.escrowMachine,
+    threeDsVerifier: ctx.threeDsVerifier,
+    wompiClient: ctx.wompiClient,
+    transactCredit: ctx.transactCredit,
+    transactTransition: ctx.transactTransition,
+    transactReverseBonus: ctx.transactReverseBonus,
+    resolveUserFromReference: ctx.resolveUserFromReference,
+  });
+
+  return c.json({
+    ok: result.ok,
+    tx_id: result.txId,
+    replay: result.replay,
+    new_state: result.newState,
+    ...(result.fraudSignal ? { fraud_signal: result.fraudSignal } : {}),
+  });
 });
 
 // ─── POST /v1/payments/:id/refund (DPO-only) ─────────────────────────────────
