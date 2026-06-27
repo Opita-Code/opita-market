@@ -19,6 +19,12 @@ import { authMiddleware } from "../lib/auth.js";
 import { handleError } from "../lib/http-errors.js";
 import { DynamoReplayStore } from "../lib/replay-store/dynamo.js";
 import { transactDebitWallet, transactEscrowTransition } from "../lib/transact/index.js";
+import {
+  DynamoVelocityCounter,
+  DynamoUserHistory,
+  type VelocityCounter,
+  type UserHistory,
+} from "../lib/velocity/index.js";
 import { payments } from "./payments.js";
 import { wallet } from "./wallet.js";
 import { tier } from "./tier.js";
@@ -69,6 +75,9 @@ export interface AppContext {
   transactTransition: (input: EscrowTransitionInput) => Promise<EscrowTransitionResult>;
   transactReverseBonus: (input: ReverseBonusInput) => Promise<void>;
   resolveUserFromReference: (reference: string) => Promise<string | null>;
+  // PR 2c — Velocity + user history (closes OPL-CARD-001/007/012/013/015)
+  velocityCounter: VelocityCounter;
+  userHistory: UserHistory;
 }
 
 let appContext: AppContext | null = null;
@@ -122,6 +131,8 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
       IpGeoCacheTable: { name: string };
       FraudSignalsTable: { name: string };
       ProcessedWebhooksTable: { name: string };
+      VelocityCountersTable: { name: string };
+      UserHistoryTable: { name: string };
       WompiPublicKey: { value: string };
       WompiPrivateKey: { value: string };
       WompiEventsSecret: { value: string };
@@ -158,6 +169,10 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
       },
       // Webhook gateway deps (PR 1.4c — Option C integration)
       replayStore: new DynamoReplayStore(docClient, Res.ProcessedWebhooksTable.name),
+
+      // PR 2c — velocity counter + user history (closes OPL-CARD-001/007/012/013/015)
+      velocityCounter: new DynamoVelocityCounter(docClient, Res.VelocityCountersTable.name),
+      userHistory: new DynamoUserHistory(docClient, Res.UserHistoryTable.name),
 
       // PR 2a — wire transact wrapper from PR 1.2 into routes
       // Closes: OPL-API-001, OPL-CARD-003, OPL-API-011, OPL-LIB-002,

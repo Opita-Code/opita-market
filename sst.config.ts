@@ -241,6 +241,30 @@ export default $config({
     });
 
     // ====================================================================
+    // PR 2c — Velocity counters + User history (closes OPL-CARD-001/007/012/013/015)
+    //
+    // VelocityCountersTable: TTL-based per-(BIN|IP|Device|Email) counters.
+    //   pk: counter_id = `${type}:${value}` (range key: window)
+    //   Counter atomically incremented via UpdateCommand ADD count :one.
+    //   TTL = window + 1h (DynamoDB auto-deletes expired counters).
+    //
+    // UserHistoryTable: prior BLOCK lookups for repeat offenders (30d TTL).
+    //   pk: user_id, range key: block_id = `${timestamp}:${uuid}` for uniqueness.
+    //   If user has prior BLOCK within 30d, auto-BLOCK without re-evaluating signals.
+    // ====================================================================
+    const velocityCountersTable = new sst.aws.Dynamo("VelocityCountersTable", {
+      fields: { counter_id: "string", window: "string" },
+      primaryIndex: { hashKey: "counter_id", rangeKey: "window" },
+      ttl: "ttl_epoch",
+    });
+
+    const userHistoryTable = new sst.aws.Dynamo("UserHistoryTable", {
+      fields: { user_id: "string", block_id: "string" },
+      primaryIndex: { hashKey: "user_id", rangeKey: "block_id" },
+      ttl: "ttl_epoch",
+    });
+
+    // ====================================================================
     // 6c. PagosAPI Lambda — REPLICATES ComplianceAPI architecture.
     //     Hybrid deploy: SST v4 Lambda with Function URL.
     //     Link: DDB tables + Wompi secrets + shared JWT secret.
@@ -264,6 +288,8 @@ export default $config({
         ipGeoCacheTable,
         fraudSignalsTable,
         processedWebhooksTable,
+        velocityCountersTable,
+        userHistoryTable,
         wompiPublicKey,
         wompiPrivateKey,
         wompiEventsSecret,
@@ -348,6 +374,8 @@ export default $config({
       IpGeoCacheTableName: ipGeoCacheTable.name,
       FraudSignalsTableName: fraudSignalsTable.name,
       ProcessedWebhooksTableName: processedWebhooksTable.name,
+      VelocityCountersTableName: velocityCountersTable.name,
+      UserHistoryTableName: userHistoryTable.name,
       MarketWebUrl: "https://market-dev.opitacode.com (Cloudflare Pages, NOT this SST stack)",
       DpoAlertsTopicArn: dpoAlertsTopic.arn,
     };

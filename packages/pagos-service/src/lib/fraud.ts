@@ -1,14 +1,28 @@
 /**
  * Anti-fraud engine for Opita Pagos.
  *
- * ALGORITHM:
- *   - Aggregate fired signals (each with weight 0-1)
- *   - Score = sum(weights) / N where N = count of fired signals
- *     (Note: this is NOT a weighted average — it's a simple sum, normalized by count)
+ * ALGORITHM (PR 2c — closes OPL-CARD-007 high FPR):
+ *   - Each signal weight is clamped to [0, 0.5] (per-signal cap)
+ *   - Score = sum(clamped weights)
  *   - Decision:
- *       score >= 0.7  → BLOCK
+ *       score >= 0.8  → BLOCK  (raised from 0.7 to compensate for cap)
  *       score >= 0.4  → REVIEW
  *       score <  0.4  → ALLOW
+ *
+ * WHY THE CAP (closes OPL-CARD-007):
+ *   The previous formula had no per-signal cap. A single TOR_EXIT (weight 1.0)
+ *   would BLOCK alone — but TOR users include legit privacy-conscious users
+ *   (journalists, activists, security researchers). A datacenter IP + a slightly
+ *   unusual time (0.5 + 0.3 = 0.8) would also BLOCK a legit cloud worker.
+ *
+ *   With cap=0.5 + threshold=0.8:
+ *     - TOR_EXIT alone: capped 0.5 → REVIEW (human review, not BLOCK)
+ *     - 5 weak signals (0.15 each): 0.75 → REVIEW (not BLOCK)
+ *     - 2 strong signals (0.6 + 0.5 → 0.5 + 0.5 = 1.0): → BLOCK
+ *     - TOR_EXIT + VPN (1.0 + 0.8 → 0.5 + 0.5 = 1.0): → BLOCK
+ *
+ *   The result: BLOCK requires MULTIPLE signals to accumulate, not a single
+ *   one. This forces attackers to evade multiple controls simultaneously.
  *
  * USAGE:
  *   1. Collect signals (e.g., TOR_EXIT, VELOCITY_EXCEEDED) from various sources
@@ -42,35 +56,35 @@ export interface FraudEvaluation {
   decision: FraudDecision;
   score: number;
   signals: FraudSignal[];
+  /** Sum of clamped weights used for the decision (signals[i].weight is preserved). */
+  cappedScore: number;
 }
 
-// Decision thresholds
-const BLOCK_THRESHOLD = 0.7;
+// Decision thresholds (PR 2c: BLOCK raised to 0.8 to compensate for cap=0.5)
+const BLOCK_THRESHOLD = 0.8;
 const REVIEW_THRESHOLD = 0.4;
+
+// Per-signal contribution cap (PR 2c: closes OPL-CARD-007 high FPR)
+const MAX_SIGNAL_CONTRIBUTION = 0.5;
 
 export class FraudEngine {
   /**
    * Evaluate a set of fired signals and produce a decision.
    *
-   * Score formula (SUM, not average):
-   *   - If no signals fired: score = 0
-   *   - Otherwise: score = sum(signal.weight)
+   * Score formula:
+   *   - cappedScore = sum(min(signal.weight, 0.5))   // each capped at 0.5
+   *   - BLOCK  if cappedScore >= 0.8
+   *   - REVIEW if cappedScore >= 0.4
+   *   - ALLOW  otherwise
    *
-   * Why SUM not average: a single strong signal (e.g., TOR_EXIT weight 1.0)
-   * should immediately BLOCK regardless of how many weak signals fired. SUM
-   * captures "any strong indicator" naturally; AVERAGE would dilute it.
-   *
-   * Thresholds:
-   *   - score >= 0.7 → BLOCK
-   *   - score >= 0.4 → REVIEW
-   *   - score <  0.4 → ALLOW
-   *
-   * Example scenarios:
-   *   - TOR_EXIT alone (weight 1.0): sum=1.0 → BLOCK
-   *   - DATACENTER_IP + SUSPICIOUS_TIMING (0.5+0.3=0.8): sum=0.8 → BLOCK
-   *   - DATACENTER_IP alone (0.5): sum=0.5 → REVIEW
-   *   - SUSPICIOUS_TIMING alone (0.3): sum=0.3 → ALLOW
-   *   - No signals: sum=0 → ALLOW
+   * Example scenarios (post PR 2c):
+   *   - TOR_EXIT alone (1.0): capped 0.5 → REVIEW (was BLOCK pre-PR 2c)
+   *   - 5 weak signals (0.15 each): 0.75 → REVIEW (was BLOCK pre-PR 2c)
+   *   - TOR_EXIT + VPN (1.0 + 0.8 → 0.5 + 0.5 = 1.0): → BLOCK
+   *   - VELOCITY + DATACENTER (0.6 + 0.5 → 0.5 + 0.5 = 1.0): → BLOCK
+   *   - DATACENTER_IP alone (0.5): → REVIEW
+   *   - SUSPICIOUS_TIMING alone (0.3): → ALLOW
+   *   - No signals: → ALLOW
    */
   evaluateSignals(signals: FraudSignal[]): FraudEvaluation {
     // Validate input
@@ -83,21 +97,25 @@ export class FraudEngine {
     }
 
     if (signals.length === 0) {
-      return { decision: "ALLOW", score: 0, signals: [] };
+      return { decision: "ALLOW", score: 0, signals: [], cappedScore: 0 };
     }
 
-    const score = signals.reduce((acc, s) => acc + s.weight, 0);
+    // PR 2c: clamp each signal to MAX_SIGNAL_CONTRIBUTION before summing
+    const cappedScore = signals.reduce(
+      (acc, s) => acc + Math.min(s.weight, MAX_SIGNAL_CONTRIBUTION),
+      0,
+    );
 
     let decision: FraudDecision;
-    if (score >= BLOCK_THRESHOLD) {
+    if (cappedScore >= BLOCK_THRESHOLD) {
       decision = "BLOCK";
-    } else if (score >= REVIEW_THRESHOLD) {
+    } else if (cappedScore >= REVIEW_THRESHOLD) {
       decision = "REVIEW";
     } else {
       decision = "ALLOW";
     }
 
-    return { decision, score, signals };
+    return { decision, score: cappedScore, signals, cappedScore };
   }
 }
 

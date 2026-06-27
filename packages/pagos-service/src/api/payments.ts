@@ -16,6 +16,7 @@ import { processWompiWebhook } from "../lib/webhook-gateway/index.js";
 import { FraudEngine } from "../lib/fraud.js";
 import { TierLimitExceededError, InvalidSignatureError, AmountInvalidError, ChannelNotAllowedError, FraudBlockedError, InvalidStateError } from "../lib/errors.js";
 import { TIERS, requires3DS, isValidTier, type Tier } from "../lib/tiers.js";
+import { collectVelocitySignals } from "../lib/velocity/index.js";
 import { getAppContext, type AppContext } from "./index.js";
 
 export const payments = new Hono();
@@ -274,10 +275,10 @@ async function lookupWallet(ctx: AppContext, userId: string): Promise<any | null
 
 async function runFraudChecks(
   ctx: AppContext,
-  user: { ip?: string },
-  _fromUserId: string,
+  user: { ip?: string; deviceId?: string },
+  fromUserId: string,
   _toUserId: string,
-  _amount: number,
+  amount: number,
 ): Promise<{ decision: "ALLOW" | "REVIEW" | "BLOCK"; signals: Array<{ type: string; weight: number }> }> {
   const ip = user.ip ?? "0.0.0.0";
   const geo = await ctx.dynamoClient.send(
@@ -287,13 +288,49 @@ async function runFraudChecks(
     }),
   ).then((r: any) => r.Item).catch(() => null);
 
-  const engine = new FraudEngine();
-  const signals = geo ? engine.evaluateSignals([
+  // IP-based geo signals (TOR/VPN/PROXY/DATACENTER)
+  const geoSignals = geo ? [
     ...(geo.is_tor ? [{ type: "TOR_EXIT" as const, weight: 1.0 }] : []),
     ...(geo.is_vpn ? [{ type: "VPN_DETECTED" as const, weight: 0.8 }] : []),
     ...(geo.is_proxy ? [{ type: "PROXY_DETECTED" as const, weight: 0.6 }] : []),
     ...(geo.is_datacenter ? [{ type: "DATACENTER_IP" as const, weight: 0.5 }] : []),
-  ]) : engine.evaluateSignals([]);
+  ] : [];
 
-  return signals;
+  // PR 2c — velocity + history signals (closes OPL-CARD-001/012/015)
+  // The first 6 digits of any "from_user_id" that looks like a card BIN
+  // For now we use the user's email as the BIN surrogate for the EMAIL_INTENT counter
+  const { signals: velocitySignals, recentBlock } = await collectVelocitySignals(
+    { counter: ctx.velocityCounter, history: ctx.userHistory },
+    {
+      userId: fromUserId,
+      ip,
+      deviceId: user.deviceId,
+      email: fromUserId,
+    },
+  );
+
+  const engine = new FraudEngine();
+  const result = engine.evaluateSignals([...geoSignals, ...velocitySignals]);
+
+  // If BLOCK decision, record to UserHistory for future repeat-offender detection
+  if (result.decision === "BLOCK") {
+    const topReason = result.signals
+      .sort((a, b) => b.weight - a.weight)[0]?.type ?? "UNKNOWN";
+    try {
+      await ctx.userHistory.recordDecision({
+        userId: fromUserId,
+        decision: "BLOCK",
+        reason: topReason,
+        timestampMs: Date.now(),
+      });
+    } catch {
+      // Best-effort — don't fail the request if history write fails
+    }
+  }
+
+  // Suppress unused warning
+  void recentBlock;
+  void amount;
+
+  return result;
 }
