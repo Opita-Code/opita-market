@@ -1,0 +1,515 @@
+{
+  "pentest_id": "OPL-PT-2026-06-26-001",
+  "engagement": "opita-market/opita-pagos-foundation",
+  "date": "2026-06-26",
+  "scope": "self-pentest of own payment gateway pre-launch",
+  "target": [
+    "packages/pagos-service/src/lib/** (16 files, 2,500+ LOC)",
+    "packages/pagos-service/src/api/** (8 files, 800 LOC)",
+    "packages/pagos-service/crons/** (6 files)",
+    "apps/market-web/src/{lib,components,pages,middleware}/**",
+    "package.json (both packages, dep CVE scan)",
+    "sst.config.ts (infrastructure)",
+    "Compliance pages, RUNBOOK, git history"
+  ],
+  "excluded": [
+    "Dynamic probing of live Lambda (not yet deployed — deferred to PR 8)",
+    "Third-party services (Wompi, Cognito, Verifik) external assessment"
+  ],
+  "methodology": {
+    "frameworks": [
+      "OWASP Top 10:2025 (web + API + LLM)",
+      "CWE Top 25 (2024)",
+      "MITRE ATT&CK v19 (Enterprise + Mobile + Financial)",
+      "STRIDE per component",
+      "WASC Threat Classification",
+      "PCI-DSS SAQ-A scope (Wompi handles PAN)",
+      "Ley 1581/2012 Habeas Data",
+      "Decreto 222/2020 (closed-loop wallets)",
+      "Estatuto Consumidor 1480/2011",
+      "UIAF (AML)",
+      "SIC dark patterns (Circular 02/2022)"
+    ],
+    "scoring": "CVSS v4.0",
+    "sub_agents_dispatched": 8,
+    "files_audited": 50,
+    "loc_audited": 4500
+  },
+  "summary": {
+    "total_findings": 87,
+    "by_severity": {
+      "CRITICAL": 20,
+      "HIGH": 22,
+      "MEDIUM": 25,
+      "LOW": 17,
+      "INFO": 3
+    },
+    "by_category": {
+      "lib_security": 15,
+      "api_security": 15,
+      "frontend_security": 15,
+      "infrastructure": 5,
+      "carding_deep": 20,
+      "git_secrets": 7,
+      "compliance": 22,
+      "llm_top_10": 2
+    },
+    "production_blockers": 22,
+    "compliance_blockers": 5,
+    "unique_after_dedup": 78,
+    "go_no_go": "NO-GO",
+    "go_no_go_rationale": "22 production-blockers + 5 regulatory compliance gaps. Cannot deploy to handle real money without addressing critical financial-loss and legal-exposure findings."
+  },
+  "production_blockers": [
+    {
+      "id": "OPL-LIB-001",
+      "category": "lib_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.1,
+      "title": "Webhook signature verifies HMAC but never validates timestamp — replay attacks possible",
+      "file": "packages/pagos-service/src/lib/wompi.ts",
+      "function": "verifyWebhookSignature",
+      "line_range": [114, 167],
+      "cwe": "CWE-345",
+      "mitre_attack": ["T1557"],
+      "blocks_production": true,
+      "blocks_production_reason": "Attacker can replay valid Wompi webhook N times → credit/debit wallet N times. Direct financial loss.",
+      "exploit_effort_minutes": 5,
+      "estimated_loss_per_exploit_cop": "transaction_amount × N"
+    },
+    {
+      "id": "OPL-LIB-002",
+      "category": "lib_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 8.1,
+      "title": "DebitWalletUseCase TOCTOU between balance read and conditional write — overdraft + stale balance leak",
+      "file": "packages/pagos-service/src/lib/ledger.ts",
+      "function": "DebitWalletUseCase.execute",
+      "line_range": [163, 208],
+      "cwe": "CWE-367",
+      "mitre_attack": ["T1099"],
+      "blocks_production": true,
+      "blocks_production_reason": "TOCTOU race can result in overdraft. Stale balance leaked to client via error message."
+    },
+    {
+      "id": "OPL-LIB-003",
+      "category": "carding_deep",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 8.1,
+      "title": "PURCHASE_CASHBACK (2%) has no per-user daily cap — unlimited bonus farming via micro-transactions",
+      "file": "packages/pagos-service/src/lib/bonus-rules.ts",
+      "line_range": [79, 96],
+      "cwe": "CWE-1390",
+      "mitre_attack": ["T1657", "T1454"],
+      "blocks_production": true,
+      "blocks_production_reason": "Attacker can farm unlimited 2% cashback on micro-transactions. Direct financial loss at scale."
+    },
+    {
+      "id": "OPL-LIB-004",
+      "category": "lib_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.0,
+      "title": "Delivery evidence photo_url accepted without SSRF validation — AWS IMDS exfiltration possible",
+      "file": "packages/pagos-service/src/lib/escrow.ts",
+      "function": "handleDeliveryConfirm",
+      "line_range": [164, 188],
+      "cwe": "CWE-918",
+      "mitre_attack": ["T1190", "T1552.001"],
+      "blocks_production": true,
+      "blocks_production_reason": "Attacker submits http://169.254.169.254/latest/meta-data/ as evidence photo. DPO clicks → AWS IAM creds exfiltrated. Full account takeover."
+    },
+    {
+      "id": "OPL-LIB-005",
+      "category": "lib_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.0,
+      "title": "x-dev-user auth bypass fail-open when NODE_ENV is undefined (Lambda default)",
+      "file": "packages/pagos-service/src/lib/auth.ts",
+      "function": "authMiddleware",
+      "line_range": [73, 84],
+      "cwe": "CWE-285",
+      "mitre_attack": ["T1078.004"],
+      "blocks_production": true,
+      "blocks_production_reason": "If Lambda deployed without NODE_ENV=production, x-dev-user header bypasses ALL auth. Attacker fabricates any identity including DPO admin."
+    },
+    {
+      "id": "MW-FE-003",
+      "category": "frontend_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 8.1,
+      "title": "[DUPLICATE] Market-web dev auth bypass in cognito-sso-consumer.ts — same pattern as OPL-LIB-005",
+      "file": "apps/market-web/src/lib/cognito-sso-consumer.ts",
+      "line_range": [84, 101],
+      "cwe": "CWE-287",
+      "owasp_2025": "A07:2025",
+      "blocks_production": true
+    },
+    {
+      "id": "OPL-API-001",
+      "category": "api_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.3,
+      "title": "Wallet P2P transfer uses non-atomic debit+credit — funds can be permanently lost",
+      "file": "packages/pagos-service/src/api/wallet.ts",
+      "endpoint": "POST /v1/wallet/:user/transfer",
+      "line_range": [166, 216],
+      "cwe": "CWE-667",
+      "owasp_api": "API4:2023",
+      "mitre_attack": ["T1106"],
+      "blocks_production": true,
+      "blocks_production_reason": "If credit leg fails after debit, sender's funds vanish. Decreto 222/2020 closed-loop funds-loss = regulatory violation."
+    },
+    {
+      "id": "OPL-API-002",
+      "category": "api_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.1,
+      "title": "POST /v1/delivery/confirm has no authentication — anyone can release escrow",
+      "file": "packages/pagos-service/src/api/delivery.ts",
+      "endpoint": "POST /v1/delivery/confirm",
+      "line_range": [11, 77],
+      "cwe": "CWE-306",
+      "owasp_api": "API2:2023",
+      "mitre_attack": ["T1078"],
+      "blocks_production": true,
+      "blocks_production_reason": "Signature verification commented out. Any internet attacker can release escrow for sub-$1M transactions without evidence."
+    },
+    {
+      "id": "OPL-API-011",
+      "category": "api_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 5.9,
+      "title": "Wallet withdraw race condition — concurrent requests can overdraw wallet",
+      "file": "packages/pagos-service/src/api/wallet.ts",
+      "endpoint": "POST /v1/wallet/:user/withdraw",
+      "line_range": [84, 146],
+      "cwe": "CWE-367",
+      "owasp_api": "API4:2023",
+      "blocks_production": true,
+      "blocks_production_reason": "Check-then-act without conditional update. Two concurrent withdraws of full balance both pass the balance check."
+    },
+    {
+      "id": "MW-FE-001",
+      "category": "frontend_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.3,
+      "title": "PUBLIC_JWT_SECRET in .env.local — secret inlined into client bundle, forgeable sessions",
+      "file": "apps/market-web/.env.local + env.d.ts",
+      "line_range": [12, 34],
+      "cwe": "CWE-798",
+      "owasp_2025": "A02:2025",
+      "mitre_attack": ["T1552.001"],
+      "blocks_production": true,
+      "blocks_production_reason": "Attacker extracts HS256 signing key from JS bundle → forge __opita_session cookies for any user."
+    },
+    {
+      "id": "MW-FE-002",
+      "category": "frontend_security",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.1,
+      "title": "Wompi widget script loaded without Subresource Integrity (SRI) — MITM card data exfiltration",
+      "file": "apps/market-web/src/lib/wompi-widget.ts",
+      "line_range": [34, 46],
+      "cwe": "CWE-829",
+      "owasp_2025": "A08:2025",
+      "mitre_attack": ["T1190", "T1059.007"],
+      "blocks_production": true,
+      "blocks_production_reason": "MITM on checkout.wompi.co serves modified widget.js → exfiltrates card data. Full payment data at risk."
+    },
+    {
+      "id": "OPL-IAM-001",
+      "category": "infrastructure",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.0,
+      "title": "Lambda IAM role scope unverified — likely broad SST auto-generated policy granting Secrets Manager access",
+      "file": "sst.config.ts",
+      "role": "ComplianceAPI/LambdaExecutionRole",
+      "cwe": "CWE-732",
+      "mitre_attack": ["T1552.001"],
+      "blocks_production": true,
+      "blocks_production_reason": "If Lambda is compromised, broad IAM allows reading ComplianceJwtSecret + VerifikApiKey. JWT forgery chain → account takeover."
+    },
+    {
+      "id": "OPL-CARD-001",
+      "category": "carding_deep",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.1,
+      "title": "Zero velocity controls — no per-BIN/IP/device/email counter. Card-testing undetected.",
+      "file": "packages/pagos-service/src/api/payments.ts + fraud.ts",
+      "line_range": [234, 256],
+      "cwe": "CWE-307",
+      "mitre_attack": ["T1657", "T1588"],
+      "blocks_production": true,
+      "blocks_production_reason": "Attacker probes thousands of cards from one IP or rotates IPs. No detection. Direct gateway to carding losses."
+    },
+    {
+      "id": "OPL-CARD-002",
+      "category": "carding_deep",
+      "severity": "CRITICAL",
+      "cvss_v4_score": 9.2,
+      "title": "Webhook handler is a stub — no state transition, no balance credit, no 3DS verification",
+      "file": "packages/pagos-service/src/api/payments.ts",
+      "endpoint": "POST /v1/payments/webhook",
+      "line_range": [128, 140],
+      "cwe": "CWE-306",
+      "mitre_attack": ["T1657"],
+      "blocks_production": true,
+      "blocks_production_reason": "Card payment flow is non-functional. Money cannot be credited. 3DS verification is bypassed. PCI-DSS SAQ-A expectation violated."
+    },
+    {
+      "id": "OPL-COMP-006",
+      "category": "compliance",
+      "severity": "CRITICAL",
+      "title": "SIC closed-loop wallet registration not evidenced — Decreto 222/2020 Art. 3 violation",
+      "file": "compliance + sst.config.ts",
+      "cwe": "REGULATORY",
+      "blocks_production": true,
+      "blocks_production_reason": "Operating a closed-loop wallet without SIC registration is a regulatory violation. Cannot legally process COP-denominated closed-loop transactions."
+    },
+    {
+      "id": "OPL-COMP-014",
+      "category": "compliance",
+      "severity": "CRITICAL",
+      "title": "UIAF alert Lambda handler throws 'not implemented' — no AML alerts in production",
+      "file": "packages/pagos-service/crons/uiaf-monitor.ts",
+      "cwe": "REGULATORY",
+      "blocks_production": true,
+      "blocks_production_reason": "UIAF requires suspicious transaction reports above 5M COP. Handler is stub. Cannot comply with anti-money-laundering obligations."
+    },
+    {
+      "id": "OPL-COMP-018",
+      "category": "compliance",
+      "severity": "CRITICAL",
+      "title": "No PEP (Politically Exposed Persons) screening — UIAF enhanced due diligence gap",
+      "file": "onboarding flow",
+      "cwe": "REGULATORY",
+      "blocks_production": true,
+      "blocks_production_reason": "UIAF requires enhanced due diligence for PEPs. No screening exists. Regulatory non-compliance."
+    },
+    {
+      "id": "OPL-COMP-019",
+      "category": "compliance",
+      "severity": "CRITICAL",
+      "title": "No sanctions screening against OFAC/UN/EU lists",
+      "file": "onboarding flow",
+      "cwe": "REGULATORY",
+      "blocks_production": true,
+      "blocks_production_reason": "Sanctions screening required for transactions above 1M COP. None exists. Could process payment to sanctioned individual = OFAC violation."
+    },
+    {
+      "id": "OPL-CARD-013",
+      "category": "carding_deep",
+      "severity": "MEDIUM",
+      "cvss_v4_score": 4.3,
+      "title": "DEVICE_FINGERPRINT_MISMATCH signal defined but device fingerprint never collected",
+      "file": "packages/pagos-service/src/lib/fraud.ts + tables.ts",
+      "line_range": [28, 29],
+      "cwe": "CWE-285",
+      "blocks_production": false,
+      "note": "Marked MEDIUM (not CRITICAL) per agent assessment, but listed here as it's part of the fraud engine hardening for completeness."
+    },
+    {
+      "id": "OPL-SECRET-001",
+      "category": "infrastructure",
+      "severity": "CRITICAL",
+      "title": "Wompi production private key (prv_prod_*) stored in plaintext root .env",
+      "file": "/.env",
+      "cwe": "CWE-798",
+      "mitre_attack": ["T1552.001"],
+      "blocks_production": true,
+      "blocks_production_reason": "prv_prod_5BW7fTritUEM64TqM0NwX2SgJWxo5Bkv is live production. Anyone with .env access (or Git history leak) can authorize Wompi payments at merchant expense. NOT in SST Secrets — needs immediate migration."
+    }
+  ],
+  "high_findings": [
+    {"id": "OPL-LIB-006", "title": "InsufficientBalanceError leaks stale balance via error message", "cvss": 7.1, "file": "ledger.ts:179-185"},
+    {"id": "OPL-LIB-007", "title": "InvalidSignatureError messages reveal webhook schema structure", "cvss": 6.9, "file": "wompi.ts:122-139"},
+    {"id": "OPL-LIB-008", "title": "FIRST_PURCHASE_CASHBACK double-claim on concurrent purchases", "cvss": 7.1, "file": "bonuses.ts:89-98"},
+    {"id": "OPL-LIB-009", "title": "No per-user referral cap — unlimited referral fraud", "cvss": 6.7, "file": "referrals.ts"},
+    {"id": "OPL-API-003", "title": "Payment intent allows from_user_id override (IDOR/mass assignment)", "cvss": 8.1, "file": "api/payments.ts:38"},
+    {"id": "OPL-API-004", "title": "Webhook no idempotency — same event processed twice", "cvss": 8.1, "file": "api/payments.ts:128-140"},
+    {"id": "OPL-API-005", "title": "Transfer accepts to_user_id from body — arbitrary victim credits", "cvss": 8.1, "file": "api/wallet.ts:150-217"},
+    {"id": "OPL-API-006", "title": "No rate limiting anywhere — Lambda DoS + enumeration", "cvss": 8.1, "file": "api/index.ts"},
+    {"id": "MW-FE-004", "title": "No CSRF protection on state-mutating API calls", "cvss": 8.6, "file": "api-client.ts:87-116"},
+    {"id": "MW-FE-005", "title": "No CSP / security headers in Astro middleware", "cvss": 7.5, "file": "middleware.ts"},
+    {"id": "MW-FE-006", "title": "JWT audience (aud) not validated — token for any service accepted", "cvss": 7.1, "file": "cognito-sso-consumer.ts:118-132"},
+    {"id": "MW-FE-007", "title": "Withdrawal phone has no format validation", "cvss": 7.0, "file": "WalletWidget.tsx:92-100"},
+    {"id": "MW-FE-008", "title": "DPO_EMAIL hardcoded in client-bundled legal-secrets.generated.ts", "cvss": 7.1, "file": "legal-secrets.generated.ts"},
+    {"id": "MW-FE-009", "title": "MarketCheckoutModal — no Escape key, no focus trap", "cvss": 7.7, "file": "MarketCheckoutModal.tsx:94-114"},
+    {"id": "OPL-IAM-003", "title": "Wompi keys in plaintext .env (also OPL-SECRET-001 but architectural gap)", "cvss": 7.0, "file": ".env"},
+    {"id": "OPL-IAM-004", "title": "Cron roles not yet defined — overpermissioning risk", "cvss": 7.0, "file": "sst.config.ts"},
+    {"id": "OPL-IAM-005", "title": "No reserved concurrency — account DoS possible", "cvss": 7.0, "file": "sst.config.ts"},
+    {"id": "OPL-CARD-004", "title": "3DS status not verified in webhook — bypass possible", "cvss": 7.5, "file": "api/payments.ts:128-140"},
+    {"id": "OPL-CARD-005", "title": "PURCHASE_CASHBACK no cooldown — unlimited cashback farming", "cvss": 7.1, "file": "bonus-rules.ts:88-96"},
+    {"id": "OPL-CARD-006", "title": "Clock injection in bonus engine — contextTs parameter", "cvss": 6.9, "file": "bonuses.ts:27-28"},
+    {"id": "OPL-CARD-007", "title": "Fraud SUM formula not normalized — high FPR", "cvss": 6.5, "file": "fraud.ts:75-101"},
+    {"id": "OPL-COMP-001", "title": "PTD missing DPO phone number", "cvss": null, "file": "PTD §1"},
+    {"id": "OPL-COMP-007", "title": "Tier 4 unlimited withdrawals — Decreto 222 limit gap", "cvss": null, "file": "tiers.ts"},
+    {"id": "OPL-COMP-010", "title": "No Terms of Service page — Estatuto Consumidor violation", "cvss": null, "file": "market-web/src/pages"},
+    {"id": "OPL-COMP-011", "title": "Wompi fees not disclosed before payment", "cvss": null, "file": "checkout flow"},
+    {"id": "OPL-COMP-015", "title": "No SAR filing to UIAF — only DPO alert", "cvss": null, "file": "uiaf-monitor.ts"},
+    {"id": "OPL-COMP-016", "title": "No structuring detection in UIAF monitor", "cvss": null, "file": "uiaf-monitor.ts"},
+    {"id": "OPL-COMP-017", "title": "No 10M COP threshold for non-cash transactions", "cvss": null, "file": "uiaf-monitor.ts"},
+    {"id": "OPL-COMP-020", "title": "Wompi fees hidden in checkout — SIC dark pattern", "cvss": null, "file": "checkout flow"}
+  ],
+  "cve_findings": [
+    {
+      "dep": "astro",
+      "version": "^5.0.8",
+      "cve_id": "CVE-2024-56159",
+      "cvss": 7.8,
+      "severity": "HIGH",
+      "in_kev": false,
+      "epss": null,
+      "fix_version": "5.0.9",
+      "exploitable": "Possibly — verify sourcemaps disabled in CI build",
+      "blocks_production": true
+    },
+    {
+      "dep": "astro",
+      "version": "^5.0.8",
+      "cve_id": "CVE-2025-66202",
+      "cvss": 6.5,
+      "severity": "MEDIUM",
+      "in_kev": false,
+      "epss": null,
+      "fix_version": "5.15.8",
+      "exploitable": "Yes — double URL-encode bypasses middleware auth",
+      "blocks_production": true
+    },
+    {
+      "dep": "hono",
+      "version": "^4.12.27",
+      "cve_id": "CVE-2026-29045",
+      "cvss": 7.5,
+      "severity": "HIGH",
+      "in_kev": false,
+      "epss": null,
+      "fix_version": "4.12.4+ (current version OK)",
+      "exploitable": "No — neither service uses Hono's static file serving",
+      "blocks_production": false
+    }
+  ],
+  "compliance_gaps": {
+    "decreto_222_2020": {
+      "status": "PARTIAL",
+      "gaps": [
+        "SIC closed-loop wallet registration missing (CRITICAL)",
+        "Tier 4 unlimited withdrawals may exceed Decreto Art. 4 limits (HIGH)",
+        "No cooling-off period implementation (MEDIUM)",
+        "Refund policy not visible to consumer (LOW)"
+      ]
+    },
+    "ley_1581_2012": {
+      "status": "GOOD",
+      "gaps": [
+        "PTD missing DPO phone (HIGH)",
+        "No opposition REST endpoint (MEDIUM)",
+        "No age verification (MEDIUM)",
+        "Aviso de Privacidad missing retention details (LOW)"
+      ]
+    },
+    "estatuto_consumidor_1480": {
+      "status": "WEAK",
+      "gaps": [
+        "No Terms of Service page (HIGH)",
+        "Wompi fees not disclosed (HIGH)",
+        "No cooling-off period (MEDIUM)",
+        "No contract formation clause (MEDIUM)",
+        "No Libro de quejas link (LOW)"
+      ]
+    },
+    "uiaf": {
+      "status": "CRITICAL",
+      "gaps": [
+        "Alert handler not wired (CRITICAL)",
+        "No SAR filing (HIGH)",
+        "No structuring detection (HIGH)",
+        "Single threshold (no 10M non-cash) (HIGH)",
+        "No PEP screening (CRITICAL)",
+        "No sanctions screening (CRITICAL)"
+      ]
+    },
+    "sic_dark_patterns": {
+      "status": "VIOLATIONS",
+      "gaps": [
+        "Hidden Wompi processing fees (HIGH)",
+        "No TOS acceptance checkbox (LOW)",
+        "No cancellation mechanism post-payment (LOW)"
+      ]
+    }
+  },
+  "operational_gaps": {
+    "cloudwatch_alarms": 0,
+    "lambda_reserved_concurrency": 0,
+    "waf_attached": false,
+    "cloudfront": false,
+    "lambda_function_url_auth": "none",
+    "structured_json_logging": false,
+    "xray_enabled": false,
+    "reconciliation_dual_control": false,
+    "secret_manager_coverage": "2 of 6 secrets (only VerifikApiKey + ComplianceJwtSecret)"
+  },
+  "remediation_priority": {
+    "phase_1_block_launch": {
+      "count": 22,
+      "effort_hours_estimate": 40,
+      "items": [
+        "Fix webhook signature timestamp validation (5 min)",
+        "Replace debit + credit with TransactWriteItems (4 hours)",
+        "Wire up webhook full state machine + 3DS verification (8 hours)",
+        "Implement HMAC signature for delivery webhook (4 hours)",
+        "Move Wompi keys to SST Secrets (2 hours)",
+        "Add nodeEnv !== 'production' AND DEV_AUTH_ENABLED check (15 min)",
+        "PUBLIC_JWT_SECRET → JWT_SECRET (no PUBLIC_) + Cloudflare runtime env (1 hour)",
+        "Wompi widget SRI + crossOrigin (1 hour)",
+        "Velocity controls in runFraudChecks (8 hours)",
+        "Per-user daily bonus cap (2 hours)",
+        "Photo URL SSRF validation in escrow (2 hours)",
+        "SIC registration for closed-loop wallet (regulatory — days/weeks)",
+        "UIAF cron wiring (8 hours)",
+        "PEP + sanctions screening (external service, $$$$)",
+        "JWT audience validation (15 min)",
+        "Race condition in withdraw → use DebitWalletUseCase (1 hour)",
+        "Clock injection removal in bonus engine (30 min)",
+        "First-purchase bonus atomic claim (2 hours)",
+        "Astro upgrade to 5.15.8+ (1 hour)",
+        "CloudWatch alarms (4 hours)",
+        "Reserved concurrency (1 hour)",
+        "CORS / security headers (1 hour)"
+      ]
+    },
+    "phase_2_first_sprint": {
+      "count": 22,
+      "effort_hours_estimate": 32,
+      "items": ["High findings (IDOR, mass assignment, rate limiting, etc.)"]
+    },
+    "phase_3_first_month": {
+      "count": 42,
+      "effort_hours_estimate": 60,
+      "items": ["Medium + Low findings, code quality, observability"]
+    },
+    "phase_4_compliance": {
+      "count": 22,
+      "effort_hours_estimate": "TBD — depends on regulatory engagement",
+      "items": ["All compliance gaps — requires legal counsel + SIC/UIAF registration"]
+    }
+  },
+  "evidence_files": [
+    "01-pagos-service-lib.json (15 findings, lib layer)",
+    "02-pagos-service-api.json (15 findings, API layer)",
+    "03-market-web-frontend.json (15 findings, frontend)",
+    "04-recon-cve.json (35 deps, 6 CVEs, 3 hardcoded secrets)",
+    "05-lambda-iam-secrets.json (5 findings, infrastructure)",
+    "06-carding-deep.json (20 findings, carding-domain deep review)",
+    "07-git-leak.json (7 findings, git history secret scan)",
+    "08-llm-compliance.json (2 LLM + 22 compliance findings)"
+  ],
+  "next_steps": [
+    "1. Operator review of this report (1 hour)",
+    "2. Schedule remediation sprint (5-7 business days for Phase 1)",
+    "3. Compliance legal review (parallel — can start now)",
+    "4. Re-pentest after Phase 1 fix (verify no regression)",
+    "5. Deploy to dev stage for dynamic probing (PR 8)",
+    "6. Production go/no-go decision after Phase 1 + 2 complete"
+  ]
+}
