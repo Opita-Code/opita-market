@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiClient, ApiClientError, type IntentRequest, type IntentResponse } from "../../lib/api-client";
 import { injectWompiWidget, removeWompiWidget } from "../../lib/wompi-widget";
+import { computeDeviceFingerprint } from "../../lib/device-fingerprint";
 
 export interface MarketCheckoutModalProps {
   open: boolean;
@@ -53,19 +54,44 @@ export function MarketCheckoutModal(props: MarketCheckoutModalProps) {
       return;
     }
     setState({ kind: "loading" });
-    apiClient
-      .createPaymentIntent({
-        amount_cop: props.amountCop,
-        channel: props.channel,
-        from_user_id: props.fromUserId,
-        to_user_id: props.toUserId,
-        product_context: props.productContext,
-        idempotency_key: idempotencyKeyRef.current,
+    // PR 7 — Collect device fingerprint (closes OPL-CARD-013).
+    // FingerprintJS open-source is async; we collect in parallel with the intent
+    // call but don't block on it. If the fingerprint fails, we send the intent
+    // without device_id (backend will treat as missing — not a hard fail).
+    Promise.all([computeDeviceFingerprint()])
+      .then(([deviceId]) => {
+        apiClient
+          .createPaymentIntent({
+            amount_cop: props.amountCop,
+            channel: props.channel,
+            from_user_id: props.fromUserId,
+            to_user_id: props.toUserId,
+            product_context: props.productContext,
+            idempotency_key: idempotencyKeyRef.current,
+            device_id: deviceId ?? undefined,
+          })
+          .then((intent) => setState({ kind: "ready", intent }))
+          .catch((e) => {
+            const code = e instanceof ApiClientError ? e.code : "INTENT_FAILED";
+            setState({ kind: "error", code });
+          });
       })
-      .then((intent) => setState({ kind: "ready", intent }))
-      .catch((e) => {
-        const code = e instanceof ApiClientError ? e.code : "INTENT_FAILED";
-        setState({ kind: "error", code });
+      .catch(() => {
+        // Fingerprint failed — still send the intent, just without device_id
+        apiClient
+          .createPaymentIntent({
+            amount_cop: props.amountCop,
+            channel: props.channel,
+            from_user_id: props.fromUserId,
+            to_user_id: props.toUserId,
+            product_context: props.productContext,
+            idempotency_key: idempotencyKeyRef.current,
+          })
+          .then((intent) => setState({ kind: "ready", intent }))
+          .catch((e) => {
+            const code = e instanceof ApiClientError ? e.code : "INTENT_FAILED";
+            setState({ kind: "error", code });
+          });
       });
   }, [props.open, props.amountCop, props.channel, props.fromUserId, props.toUserId, props.productContext.kind, props.productContext.ref_id]);
 

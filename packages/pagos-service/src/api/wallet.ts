@@ -6,6 +6,7 @@ import { InvalidStateError, InsufficientBalanceError, AmountInvalidError, Withdr
 import { getAppContext } from "./index.js";
 import { TIERS, withdrawHoldFor, isValidTier, type Tier } from "../lib/tiers.js";
 import { transactP2PTransfer, transactDebitWallet } from "../lib/transact/index.js";
+import { canWithdraw, getOldestUnreleasedDeposit } from "../lib/withdrawal-cooling-off.js";
 import { randomUUID } from "node:crypto";
 
 export const wallet = new Hono();
@@ -132,6 +133,24 @@ wallet.post("/:user/withdraw", async (c) => {
       holdHours,
     );
   }
+
+  // PR 7 — Per-deposit hold tracking (closes OPL-CARD-008, Decreto 222/2020 Art. 4).
+  // Replaces the old tier-based `withdrawHoldFor` check with actual ledger lookup.
+  // The OLDEST unreleased DEPOSITO entry determines withdrawal eligibility — not the
+  // aggregate tier-level hold logic. Tier 4 unlimited withdrawal exemption only applies
+  // after the 5-day cooling-off window.
+  const oldestDeposit = await getOldestUnreleasedDeposit(
+    { userId: targetUser, nowMs: Date.now() },
+    { queryClient: ctx.dynamoClient as any, ledgerTableName: ctx.ledgerTable },
+  );
+  // ts_seq format: `${ISO-timestamp}#${seq}` — extract the created_at portion.
+  const oldestDepositIso = oldestDeposit?.ts_seq?.split("#")[0];
+  canWithdraw({
+    userId: targetUser,
+    amountCop: amount,
+    oldestUnreleasedDepositIso: oldestDepositIso,
+    nowIso: new Date().toISOString(),
+  });
 
   if (ctx.abortFlags.payoutsPaused) {
     throw new InvalidStateError("Payouts are paused (emergency kill-switch active)");

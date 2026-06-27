@@ -14,9 +14,10 @@ import { requireUser, requireDpo } from "../lib/auth.js";
 import { verifyWebhookSignature, generateIntegritySignature } from "../lib/wompi.js";
 import { processWompiWebhook } from "../lib/webhook-gateway/index.js";
 import { FraudEngine } from "../lib/fraud.js";
-import { TierLimitExceededError, InvalidSignatureError, AmountInvalidError, ChannelNotAllowedError, FraudBlockedError, InvalidStateError } from "../lib/errors.js";
+import { TierLimitExceededError, InvalidSignatureError, AmountInvalidError, ChannelNotAllowedError, FraudBlockedError, InvalidStateError, RefundFailedError } from "../lib/errors.js";
 import { TIERS, requires3DS, isValidTier, type Tier } from "../lib/tiers.js";
 import { collectVelocitySignals } from "../lib/velocity/index.js";
+import { detectStructuring, isInBoundaryRange } from "../lib/structuring.js";
 import { getAppContext, type AppContext } from "./index.js";
 
 export const payments = new Hono();
@@ -83,6 +84,23 @@ payments.post("/intent", async (c) => {
   const fraud = await runFraudChecks(ctx, user, fromUserId, toUserId, amount);
   if (fraud.decision === "BLOCK") {
     throw new FraudBlockedError(`Blocked: ${fraud.signals.map((s) => s.type).join(",")}`, fraud.signals);
+  }
+
+  // PR 7 — Structuring detection (closes OPL-CARD-016).
+  // If the current tx is in the 200k-300k boundary range AND the sender
+  // already has 3+ such tx to the same recipient in the last 24h, flag for
+  // DPO review. The flag is logged (and written to FraudSignals table)
+  // but does NOT block the immediate tx — the pattern itself is what matters.
+  if (isInBoundaryRange(amount)) {
+    const structuring = await detectStructuring(
+      { senderId: fromUserId, recipientId: toUserId, amountCop: amount, nowMs: Date.now() },
+      { queryClient: ctx.dynamoClient, transactionsTableName: ctx.transactionsTable },
+    );
+    if (structuring) {
+      // Append the structuring signal to fraud.signals — doesn't BLOCK
+      // but writes to FraudSignals table on BLOCK/REVIEW decisions.
+      fraud.signals.push({ type: "SUSPICIOUS_TIMING", weight: 0.4 });
+    }
   }
 
   // Create transaction
@@ -184,21 +202,48 @@ payments.post("/:id/refund", async (c) => {
   if (tx.status === "REFUNDED") throw new InvalidStateError("Already refunded");
   if (tx.status !== "APPROVED") throw new InvalidStateError("Cannot refund unapproved tx");
 
-  await ctx.dynamoClient.send(
-    new UpdateCommand({
-      TableName: ctx.transactionsTable,
-      Key: { transaction_id: txId },
-      UpdateExpression: "SET #s = :refunded, updated_at = :now",
-      ExpressionAttributeNames: { "#s": "status" },
-      ExpressionAttributeValues: {
-        ":refunded": "REFUNDED",
-        ":now": new Date().toISOString(),
-      },
-    }),
-  );
+  // PR 7 — Closes OPL-CARD-014: actually call Wompi refund API.
+  // SECURITY: wompi_tx_id is the Wompi-side transaction id (NOT the Opita tx_id).
+  // The WompiClient.refundTransaction uses the private key via Bearer auth — never
+  // exposed to the client. On Wompi failure, the tx remains APPROVED and the caller
+  // sees a generic 502 (no Wompi internals leaked).
+  const wompiTxId = tx.wompi_tx_id ?? txId;
+  const refundResult = await ctx.wompiClient.refundTransaction({
+    wompiTransactionId: wompiTxId,
+    amountInCents: tx.amount_cop,
+    reason: "DPO-initiated refund",
+  });
 
-  // PR 6 simplified: PR 8 will call Wompi refund API + reverse bonuses
-  return c.json({ refund_id: txId, status: "PROCESSING" });
+  if (!refundResult.ok) {
+    // Wompi refused — tx stays APPROVED. Re-throw as typed error for HTTP mapping.
+    throw new RefundFailedError(
+      refundResult.error ?? "Wompi refund failed",
+      refundResult.error,
+      refundResult.httpStatus,
+    );
+  }
+
+  // Reverse bonuses for this transaction (idempotent — uses tx_id in bonus lookup).
+  // Closes the bonus reversal gap that left sellers with cashback on refunded tx.
+  await ctx.transactReverseBonus({
+    transactionId: txId,
+    idempotencyKey: `refund:${txId}:${refundResult.wompiRefundId ?? Date.now()}`,
+  });
+
+  // Atomic escrow + tx status transition (HELD → REFUNDED).
+  await ctx.transactTransition({
+    txId,
+    fromState: "HELD",
+    toState: "REFUNDED",
+    idempotencyKey: `refund:${txId}:${refundResult.wompiRefundId ?? "pending"}`,
+  });
+
+  return c.json({
+    refund_id: refundResult.wompiRefundId,
+    status: "COMPLETED",
+    amount_cop: tx.amount_cop,
+    wompi_refund_id: refundResult.wompiRefundId,
+  });
 });
 
 // ─── POST /v1/payments/:id/dispute (buyer) ──────────────────────────────────

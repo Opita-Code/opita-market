@@ -71,6 +71,15 @@ export interface MarketLedgerEntry {
   transaction_id?: string;
   bonus_rule_id?: string;
   metadata?: Record<string, string | number | boolean>;
+  /**
+   * PR 7 — Held-until timestamp for DEPOSITO entries (Decreto 222/2020 Art. 4).
+   * Set to created_at + 5 days on DEPOSITO. Withdrawal flow uses
+   * `getOldestUnreleasedDeposit()` to find the binding constraint.
+   * `released=true` flag overrides held_until (manually released by DPO).
+   */
+  held_until?: string;
+  released?: boolean;
+  released_at?: string;
 }
 
 export interface MarketTransaction {

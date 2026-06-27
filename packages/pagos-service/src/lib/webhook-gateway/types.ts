@@ -57,6 +57,23 @@ export interface WompiClient {
     id: string;
     status: string;
     payment_method: { extra?: { three_ds_authentication?: { authentication_value?: string } } };
+  } | null>;
+  /**
+   * PR 7 — Issue a refund (closes OPL-CARD-014).
+   * Returns { ok, wompiRefundId?, status?, error? }.
+   * Does NOT throw on business failure — caller maps HTTP status.
+   */
+  refundTransaction(input: {
+    wompiTransactionId: string;
+    amountInCents?: number;
+    reason?: string;
+  }): Promise<{
+    ok: boolean;
+    wompiRefundId?: string;
+    status?: string;
+    amountInCents?: number;
+    error?: string;
+    httpStatus?: number;
   }>;
 }
 

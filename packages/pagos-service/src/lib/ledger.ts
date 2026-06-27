@@ -52,9 +52,11 @@ export interface BalanceResult {
 
 // ─── Use Cases ───────────────────────────────────────────────────────────────
 
+import { computeHeldUntilIso } from "./withdrawal-cooling-off.js";
+
 /**
  * Credit a wallet by `amountCop`. Creates wallet row if not exists.
- * Appends a DEPOSITO ledger entry.
+ * Appends a DEPOSITO ledger entry with `held_until` field (PR 7 — closes OPL-CARD-008).
  */
 export class CreditWalletUseCase {
   constructor(
@@ -99,7 +101,7 @@ export class CreditWalletUseCase {
       }),
     );
 
-    // Step 2: Append ledger entry.
+    // Step 2: Append ledger entry with held_until (5-day cooling-off per Decreto 222).
     await this.appendLedgerEntry(input.userId, "DEPOSITO", input.amountCop, input.transactionId, input.metadata);
   }
 
@@ -124,6 +126,13 @@ export class CreditWalletUseCase {
       transaction_id: transactionId,
       metadata,
     };
+
+    // PR 7 — Per-deposit hold tracking (closes OPL-CARD-008, Decreto 222/2020 Art. 4).
+    // DEPOSITO entries are tagged with `held_until` = created_at + 5 days.
+    // The withdrawal flow (getOldestUnreleasedDeposit) uses this to enforce cooling-off.
+    if (movement === "DEPOSITO") {
+      entry.held_until = computeHeldUntilIso(ts);
+    }
 
     // Read current balance (best effort) to populate balance_after
     try {

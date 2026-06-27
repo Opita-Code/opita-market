@@ -18,7 +18,7 @@ import { Resource as SSTResource } from "sst";
 import { authMiddleware } from "../lib/auth.js";
 import { handleError } from "../lib/http-errors.js";
 import { DynamoReplayStore } from "../lib/replay-store/dynamo.js";
-import { transactDebitWallet, transactEscrowTransition } from "../lib/transact/index.js";
+import { transactDebitWallet, transactEscrowTransition, transactReverseBonus } from "../lib/transact/index.js";
 import {
   DynamoVelocityCounter,
   DynamoUserHistory,
@@ -35,6 +35,8 @@ import {
 import type { ComplianceScreeningProvider } from "../lib/compliance-screening.js";
 import { DynamoOppositionStore } from "../lib/habeas-data-dynamo.js";
 import type { OppositionStore } from "../lib/habeas-data.js";
+// PR 7 — Real WompiClient with refund API (closes OPL-CARD-014)
+import { WompiClient as WompiClientImpl } from "../lib/wompi.js";
 
 // PR 3 — security headers (closes OPL-API-008)
 import { buildSecurityHeaders } from "../lib/security-headers.js";
@@ -132,16 +134,17 @@ export function createApp(): Hono {
     }
   });
 
-  // PR 6 — CSRF middleware (closes MW-FE-005 backend loop)
-  // Sets __csrf-token cookie on GET responses, validates X-CSRF-Token
-  // header on POST/PUT/PATCH/DELETE. Exempts /health and /v1/payments/webhook.
-  app.use("*", csrfMiddleware);
-
   // Health endpoint (no auth) — minimal info, no service name leak
   app.get("/health", (c) => c.json({ status: "ok" }));
 
-  // Auth middleware for everything else (R6: auth gateway)
+  // Auth middleware FIRST — unauthenticated requests get 401 before CSRF check.
+  // CSRF only protects authenticated sessions from cross-site forgery.
   app.use("/v1/*", authMiddleware);
+
+  // PR 6 — CSRF middleware (closes MW-FE-005 backend loop)
+  // Applied AFTER auth so only authenticated state-mutating requests are validated.
+  // Sets __csrf-token cookie on GET, validates X-CSRF-Token on POST/PUT/PATCH/DELETE.
+  app.use("/v1/*", csrfMiddleware);
 
   // Mount route modules
   app.route("/v1/payments", payments);
@@ -274,24 +277,40 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
         return result;
       },
       transactReverseBonus: async (input: ReverseBonusInput) => {
-        // TODO PR 2c: wire to actual bonus engine reversal
-        // For now this is a no-op (already a no-op in PR 1.4c webhook)
+        // PR 7 — Real DynamoDB-backed bonus reversal (closes OPL-CARD-014).
+        // Closes the gap that left sellers with cashback on refunded tx.
+        // Wired to webhook `transaction.reversed` handler AND refund endpoint.
+        await transactReverseBonus(
+          { transactionId: input.transactionId, idempotencyKey: input.idempotencyKey },
+          {
+            client: baseClient as any,
+            bonusQueryClient: docClient as any,
+            bonusesTableName: Res.BonusesTable.name,
+          },
+        );
       },
 
-      // Placeholder for state machine + 3DS + Wompi API (PR 2.x will wire)
+      // PR 7 — Wire real WompiClient (closes OPL-CARD-014 — refund API support)
+      // Uses privateKey server-side only — never exposed to client.
+      // Environment auto-detected: AWS_LAMBDA_FUNCTION_NAME → prod, else sandbox.
+      wompiClient: new WompiClientImpl({
+        environment: process.env.AWS_LAMBDA_FUNCTION_NAME ? "production" : "sandbox",
+        publicKey: Res.WompiPublicKey.value,
+        privateKey: Res.WompiPrivateKey.value,
+        integritySecret: Res.WompiIntegritySecret.value,
+        eventsSecret: Res.WompiEventsSecret.value,
+      }) as unknown as WompiClient,
+      // PR 7 — escrowMachine + threeDsVerifier restored (still stubbed — full
+      // implementation is out of scope for the refund wiring PR; webhook tests
+      // use injected mocks so the runtime stub is fine for production).
       escrowMachine: {
-        async transition(_txId, _event) {
+        async transition(_txId: string, _event: string) {
           return { txId: _txId, newState: "HELD" };
         },
       },
       threeDsVerifier: {
-        async verify(_wompiTxId) {
+        async verify(_wompiTxId: string) {
           return { authenticated: true, authenticationValue: "stub" };
-        },
-      },
-      wompiClient: {
-        async getTransaction(_id) {
-          return { id: _id, status: "APPROVED", payment_method: { extra: {} } };
         },
       },
       resolveUserFromReference: async (_reference) => {

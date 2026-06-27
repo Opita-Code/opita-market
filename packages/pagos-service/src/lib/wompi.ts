@@ -4,15 +4,18 @@
  * Supports:
  *   - Integrity signature generation (widget-side hash)
  *   - Webhook signature verification (HMAC SHA256 with timing-safe-equal)
+ *   - Refund API (PR 7 — closes OPL-CARD-014)
  *
  * SPEC REFERENCES:
  *   - Widget signature: https://docs.wompi.co/en/docs/colombia/widget-checkout-web/#step-3-generate-an-integrity-signature
  *   - Webhook signature: https://docs.wompi.co/en/docs/colombia/eventos/
+ *   - Refund: https://docs.wompi.co/en/docs/colombia/reembolsos/
  *
  * SECURITY:
  *   - Webhook verification uses crypto.timingSafeEqual to prevent timing attacks.
  *   - Generic 401 error is thrown on any mismatch (no detail leaked to caller).
  *   - The integrity secret must NEVER be exposed to the client-side (always generate on server).
+ *   - The private key must NEVER be exposed to the client-side (refund API is server-only).
  */
 
 import crypto from "node:crypto";
@@ -238,4 +241,159 @@ export class WompiClient {
   verifyWebhook(body: WompiWebhookBody): boolean {
     return verifyWebhookSignature(body, this.eventsSecret);
   }
+
+  /**
+   * Get transaction status from Wompi.
+   *
+   * Wompi docs: https://docs.wompi.co/en/docs/colombia/transacciones/
+   * Endpoint: GET {baseUrl}/transactions/{id}
+   * Auth: Bearer <privateKey>
+   *
+   * Used by the webhook gateway to verify 3DS authentication (PR 1.4c —
+   * closes OPL-CARD-004). On a fetch failure, returns null — the caller
+   * decides HTTP status mapping (502 for upstream failure).
+   *
+   * SECURITY:
+   *   - Uses privateKey via Authorization: Bearer header
+   *   - Never logs the privateKey
+   *   - Never includes the privateKey in error messages returned to caller
+   */
+  async getTransaction(id: string): Promise<{
+    id: string;
+    status: string;
+    payment_method: { extra?: { three_ds_authentication?: { authentication_value?: string } } };
+  } | null> {
+    if (!id) return null;
+    const url = `${this.baseUrl}/transactions/${encodeURIComponent(id)}`;
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${this.privateKey}`,
+        },
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as {
+        data?: {
+          id?: string;
+          status?: string;
+          payment_method?: { extra?: { three_ds_authentication?: { authentication_value?: string } } };
+        };
+      };
+      const data = json?.data;
+      if (!data) return null;
+      return {
+        id: data.id ?? id,
+        status: data.status ?? "UNKNOWN",
+        payment_method: data.payment_method ?? {},
+      };
+    } catch {
+      // Network error / fetch failure — return null; caller maps to 502.
+      return null;
+    }
+  }
+
+  // ─── Refund (PR 7 — closes OPL-CARD-014) ────────────────────────────────────
+
+  /**
+   * Issue a refund for a previously-approved Wompi transaction.
+   *
+   * Wompi docs: https://docs.wompi.co/en/docs/colombia/reembolsos/
+   * Endpoint: POST {baseUrl}/transactions/{id}/refund
+   * Auth: Bearer <privateKey>
+   *
+   * Returns { ok, wompiRefundId, status, error? }.
+   * Does NOT throw on business failure (Wompi declined, tx not found, etc.) —
+   * the caller decides HTTP status mapping.
+   *
+   * SECURITY:
+   *   - Uses privateKey via Authorization: Bearer header
+   *   - Never logs the privateKey
+   *   - Never includes the privateKey in error messages returned to caller
+   */
+  async refundTransaction(input: RefundInput): Promise<RefundResult> {
+    if (!input.wompiTransactionId) {
+      return { ok: false, error: "Missing wompiTransactionId" };
+    }
+
+    const url = `${this.baseUrl}/transactions/${encodeURIComponent(input.wompiTransactionId)}/refund`;
+    const body: Record<string, unknown> = {};
+    if (typeof input.amountInCents === "number" && input.amountInCents > 0) {
+      body.amount = input.amountInCents;
+    }
+    if (input.reason) {
+      body.reason = input.reason;
+    }
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.privateKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        // SECURITY: do NOT include raw Wompi response or privateKey in error
+        return {
+          ok: false,
+          error: `Wompi refund HTTP ${res.status}`,
+          httpStatus: res.status,
+        };
+      }
+
+      const json = (await res.json()) as {
+        data?: {
+          id?: string;
+          status?: string;
+          amount_in_cents?: number;
+        };
+      };
+      const data = json?.data;
+      if (!data?.id) {
+        return { ok: false, error: "Wompi refund response missing data.id" };
+      }
+
+      return {
+        ok: true,
+        wompiRefundId: data.id,
+        status: data.status ?? "APPROVED",
+        amountInCents: data.amount_in_cents ?? input.amountInCents ?? 0,
+      };
+    } catch (err) {
+      // Network error / fetch failure
+      return {
+        ok: false,
+        error: `Wompi refund transport error: ${(err as Error).name ?? "unknown"}`,
+      };
+    }
+  }
+}
+
+// ─── Refund types (PR 7 — closes OPL-CARD-014) ─────────────────────────────────
+
+export interface RefundInput {
+  /** Wompi transaction id (NOT the Opita internal tx_id). */
+  wompiTransactionId: string;
+  /** Optional partial-refund amount in cents. Omit for full refund. */
+  amountInCents?: number;
+  /** Optional human-readable reason (stored in Wompi dashboard audit log). */
+  reason?: string;
+}
+
+export interface RefundResult {
+  ok: boolean;
+  /** Wompi refund id (when ok=true). */
+  wompiRefundId?: string;
+  /** Wompi refund status: APPROVED | PENDING | DECLINED | ERROR. */
+  status?: string;
+  /** Actual refunded amount in cents (echoed by Wompi). */
+  amountInCents?: number;
+  /** Error code when ok=false. Never includes raw response or secrets. */
+  error?: string;
+  /** Wompi HTTP status when ok=false. */
+  httpStatus?: number;
 }

@@ -24,3 +24,10 @@ export {
   type BonusClaimInput,
   type BonusClaimResult,
 } from "./bonus.js";
+
+export {
+  transactReverseBonus,
+  type ReverseBonusInput,
+  type ReverseBonusResult,
+  type ReverseBonusDeps,
+} from "./bonus.js";

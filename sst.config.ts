@@ -215,8 +215,14 @@ export default $config({
     });
 
     const bonusesTable = new sst.aws.Dynamo("BonusesTable", {
-      fields: { user_id: "string", rule_id: "string" },
+      fields: { user_id: "string", rule_id: "string", transaction_id: "string" },
       primaryIndex: { hashKey: "user_id", rangeKey: "rule_id" },
+      // PR 7 — TransactionIdIndex (closes OPL-CARD-014 bonus reversal flow)
+      // Lookup all bonuses credited for a refunded transaction.
+      // Without this GSI, refund couldn't find which bonuses to reverse.
+      globalIndexes: {
+        TransactionIdIndex: { hashKey: "transaction_id" },
+      },
     });
 
     const ipGeoCacheTable = new sst.aws.Dynamo("IpGeoCacheTable", {

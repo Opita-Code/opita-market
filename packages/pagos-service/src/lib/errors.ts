@@ -291,3 +291,17 @@ export class InternalError extends OpitaPagosError {
     super(message, false);
   }
 }
+
+// PR 7 — Refund errors (closes OPL-CARD-014)
+
+export class RefundFailedError extends OpitaPagosError {
+  readonly code = "REFUND_FAILED";
+  readonly httpStatus = 502; // Bad Gateway — upstream (Wompi) failed
+  constructor(
+    message: string,
+    public readonly wompiErrorCode?: string,
+    public readonly wompiHttpStatus?: number,
+  ) {
+    super(message, false); // do NOT expose Wompi internals to client
+  }
+}

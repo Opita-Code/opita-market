@@ -19,6 +19,7 @@ import {
   transactP2PTransfer,
   transactEscrowTransition,
   transactBonusClaim,
+  transactReverseBonus,
   type TransactItem,
   type TransactDeps,
 } from "../../../src/lib/transact/index.js";
@@ -247,6 +248,114 @@ describe("transact — bonus", () => {
         { client: client as any },
       ),
     ).rejects.toThrow(ConditionFailedError);
+  });
+});
+
+describe("transact — PR 7 transactReverseBonus (closes OPL-CARD-014)", () => {
+  /**
+   * Reverse-bonus uses TWO clients:
+   *  - bonusQueryClient: docClient for GSI query (BonusesTable.TransactionIdIndex)
+   *  - client: raw DynamoDB for TransactWriteItems
+   */
+  function makeReverseDeps(queryItems: any[] = []) {
+    const transactClient = new MockDynamoClient();
+    const queryClient = {
+      send: vi.fn(async () => ({ Items: queryItems })),
+    };
+    return {
+      transactClient,
+      queryClient,
+      deps: {
+        client: transactClient as any,
+        bonusQueryClient: queryClient as any,
+        bonusesTableName: "BonusesTable",
+      } as any,
+    };
+  }
+
+  it("reverses 2 bonuses + debits wallet total in single TransactWriteItems", async () => {
+    const { transactClient, queryClient, deps } = makeReverseDeps([
+      { user_id: "seller-1", rule_id: "PURCHASE_CASHBACK", amount_cop: 2000, reversed: false },
+      { user_id: "seller-1", rule_id: "SELLER_REPEAT_SALE", amount_cop: 5000, reversed: false },
+    ]);
+    const result = await transactReverseBonus(
+      { transactionId: "tx-refund-1", idempotencyKey: "refund:tx-refund-1:wrefund-abc" },
+      deps,
+    );
+    expect(result.reversedCount).toBe(2);
+    expect(result.totalDebitedCop).toBe(7000);
+    // 2 bonus updates + 1 wallet debit = 3 TransactWriteItems in 1 call
+    expect(transactClient.callCount).toBe(1);
+    const cmd = transactClient.calls[0] as any;
+    expect(cmd.TransactItems).toHaveLength(3);
+    // Query used the GSI with transaction_id
+    expect(queryClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        IndexName: "TransactionIdIndex",
+        KeyConditionExpression: "transaction_id = :tid",
+      }),
+    );
+  });
+
+  it("returns 0/0 when no un-reversed bonuses exist (idempotent retry)", async () => {
+    const { transactClient, deps } = makeReverseDeps([
+      { user_id: "seller-1", rule_id: "PURCHASE_CASHBACK", amount_cop: 2000, reversed: true },
+    ]);
+    const result = await transactReverseBonus(
+      { transactionId: "tx-refund-1", idempotencyKey: "k1" },
+      deps,
+    );
+    expect(result.reversedCount).toBe(0);
+    expect(result.totalDebitedCop).toBe(0);
+    // No TransactWriteItems call when nothing to reverse
+    expect(transactClient.callCount).toBe(0);
+  });
+
+  it("filters out already-reversed bonuses", async () => {
+    const { transactClient, deps } = makeReverseDeps([
+      { user_id: "seller-1", rule_id: "PURCHASE_CASHBACK", amount_cop: 2000, reversed: true },
+      { user_id: "seller-1", rule_id: "SELLER_REPEAT_SALE", amount_cop: 5000, reversed: false },
+    ]);
+    const result = await transactReverseBonus(
+      { transactionId: "tx-1", idempotencyKey: "k1" },
+      deps,
+    );
+    // Only the second one is reversed
+    expect(result.reversedCount).toBe(1);
+    expect(result.totalDebitedCop).toBe(5000);
+    const cmd = transactClient.calls[0] as any;
+    expect(cmd.TransactItems).toHaveLength(2); // 1 bonus update + 1 wallet debit
+  });
+
+  it("throws if wallet balance < total bonus to debit (closes OPL-LIB-006 — no info leak)", async () => {
+    const { transactClient, deps } = makeReverseDeps([
+      { user_id: "seller-1", rule_id: "PURCHASE_CASHBACK", amount_cop: 1_000_000, reversed: false },
+    ]);
+    transactClient.alwaysFailWithConditionCheck();
+    await expect(
+      transactReverseBonus({ transactionId: "tx-1", idempotencyKey: "k1" }, deps),
+    ).rejects.toThrow();
+    // The error message MUST NOT include the actual balance or amount
+    try {
+      await transactReverseBonus({ transactionId: "tx-1", idempotencyKey: "k1" }, deps);
+    } catch (e) {
+      expect((e as Error).message).not.toContain("1000000");
+      expect((e as Error).message).not.toContain("seller-1");
+    }
+  });
+
+  it("rejects empty transactionId", async () => {
+    const { deps } = makeReverseDeps();
+    await expect(
+      transactReverseBonus({ transactionId: "", idempotencyKey: "k1" }, deps),
+    ).rejects.toThrow(/transactionId/);
+  });
+
+  it("rejects empty idempotencyKey", async () => {
+    const { deps } = makeReverseDeps();
+    await expect(
+      transactReverseBonus({ transactionId: "tx-1", idempotencyKey: "" }, deps),
+    ).rejects.toThrow(/idempotencyKey/);
   });
 });
 
