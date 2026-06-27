@@ -59,6 +59,14 @@ export const csrfMiddleware: MiddlewareHandler = async (c: Context, next) => {
   const cookieHeader = c.req.header("cookie") ?? null;
   const existingCsrf = parseCsrfCookie(cookieHeader);
 
+  // Bypass: programmatic API clients (no cookies at all).
+  // Real browser requests ALWAYS include cookies (session + CSRF).
+  // CLI / server-to-server tools send no cookies → no CSRF surface.
+  const isProgrammatic = !cookieHeader;
+  if (isProgrammatic) {
+    return next();
+  }
+
   if (STATE_MUTATING_METHODS.has(method)) {
     // Validate: X-CSRF-Token header must match __csrf-token cookie
     const headerToken = c.req.header(CSRF_HEADER_NAME) ?? null;
