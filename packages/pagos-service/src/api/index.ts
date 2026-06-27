@@ -17,6 +17,7 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { Resource as SSTResource } from "sst";
 import { authMiddleware } from "../lib/auth.js";
 import { handleError } from "../lib/http-errors.js";
+import { bodySizeLimit } from "../lib/body-size-limit.js";
 import { DynamoReplayStore } from "../lib/replay-store/dynamo.js";
 import { transactDebitWallet, transactEscrowTransition, transactReverseBonus } from "../lib/transact/index.js";
 import {
@@ -136,6 +137,13 @@ export function createApp(): Hono {
 
   // Health endpoint (no auth) — minimal info, no service name leak
   app.get("/health", (c) => c.json({ status: "ok" }));
+
+  // PR 7 — Body size limit middleware (closes OPL-API-007).
+  // Rejects huge JSON payloads BEFORE any handler work. Default 100 KB.
+  // Applied to ALL routes (including /health) so we don't even parse
+  // the body of malformed POSTs to /health. Webhook can override with
+  // bodySizeLimit({ maxBytes: 1024 * 1024 }) if needed.
+  app.use("*", bodySizeLimit());
 
   // Auth middleware FIRST — unauthenticated requests get 401 before CSRF check.
   // CSRF only protects authenticated sessions from cross-site forgery.
