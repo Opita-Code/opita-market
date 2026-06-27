@@ -17,8 +17,6 @@ export const PTD_NIT = "1007465784";
 export const PTD_DIRECCION = "Neiva, Huila, Colombia";
 export const PTD_REP_LEGAL = "Representante Legal de Opita Code";
 export const PTD_EMAIL_PUBLICO = "Owner@opitacode.com";
-// PR 10 (closes OPL-COMP-001, HIGH) — DPO / company phone placeholder.
-// Operator MUST replace with real number before prod (Ley 1581 Art. 13).
-export const PTD_TELEFONO = "+57 8 8700000 (placeholder — operator must set real number before prod)";
-// DPO_EMAIL removed (PR 3 — was bundled, now fetched at runtime via getDpoContactUrl)
-// export const PTD_DPO_EMAIL = "nicourrutia83@gmail.com";
+export const PTD_DPO_EMAIL = "nicourrutia83@gmail.com";
+export const PTD_TELEFONO = "+57 8 8700000 (staging)";
+export const PUBLIC_PTD_TELEFONO = "+57 8 8700000 (staging)";

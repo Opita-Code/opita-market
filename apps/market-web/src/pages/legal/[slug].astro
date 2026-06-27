@@ -1,5 +1,5 @@
 ---
-import { getEntry, type CollectionEntry } from "astro:content";
+import { getEntry, render, type CollectionEntry } from "astro:content";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { substitute } from "../../lib/legal-secrets";
 
@@ -13,7 +13,7 @@ import { substitute } from "../../lib/legal-secrets";
  * by `remark-substitute-legal-placeholders` (registered in
  * astro.config.mjs) which replaces `{{TOKEN}}` markers with SST Secret
  * values at AST level. Frontmatter values (`title`, `summary`,
- * `contact_email`) are substituted HERE at request time so the same
+ * contact_email) are substituted HERE at request time so the same
  * SST Secret values flow into the surrounding layout.
  */
 const slug = Astro.params.slug ?? "";
@@ -21,7 +21,7 @@ const entry = (await getEntry("legal", slug)) as CollectionEntry<"legal"> | unde
 if (!entry) {
   return new Response("Not found", { status: 404 });
 }
-const { Content } = await entry.render();
+const { Content, remarkPluginFrontmatter } = await render(entry);
 
 const renderedTitle = substitute(entry.data.title);
 const renderedSummary = entry.data.summary ? substitute(entry.data.summary) : undefined;
