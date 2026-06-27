@@ -38,6 +38,8 @@ import type { OppositionStore } from "../lib/habeas-data.js";
 
 // PR 3 — security headers (closes OPL-API-008)
 import { buildSecurityHeaders } from "../lib/security-headers.js";
+// PR 6 — CSRF middleware (closes MW-FE-005 backend loop)
+import { csrfMiddleware } from "../lib/csrf-middleware.js";
 import { payments } from "./payments.js";
 import { wallet } from "./wallet.js";
 import { tier } from "./tier.js";
@@ -129,6 +131,11 @@ export function createApp(): Hono {
       c.header(name, value);
     }
   });
+
+  // PR 6 — CSRF middleware (closes MW-FE-005 backend loop)
+  // Sets __csrf-token cookie on GET responses, validates X-CSRF-Token
+  // header on POST/PUT/PATCH/DELETE. Exempts /health and /v1/payments/webhook.
+  app.use("*", csrfMiddleware);
 
   // Health endpoint (no auth) — minimal info, no service name leak
   app.get("/health", (c) => c.json({ status: "ok" }));
