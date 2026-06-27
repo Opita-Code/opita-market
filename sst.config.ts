@@ -307,6 +307,12 @@ export default $config({
       ttl: "ttl_epoch",
     });
 
+    // PR 4b — Compliance screening secret (CLOSES OPL-COMP-018, OPL-COMP-019)
+    // Currently NOT provisioned (provider swap not committed).
+    // To enable ComplyAdvantage: `npx sst secret set ComplyAdvantageApiKey <key>`
+    // then uncomment the lines below + swap provider in api/index.ts.
+    // const complyAdvantageApiKey = new sst.Secret("ComplyAdvantageApiKey");
+
     // ====================================================================
     // 6c. PagosAPI Lambda — REPLICATES ComplianceAPI architecture.
     //     Hybrid deploy: SST v4 Lambda with Function URL.

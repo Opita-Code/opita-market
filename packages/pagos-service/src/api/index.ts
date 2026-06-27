@@ -29,6 +29,10 @@ import { DynamoBonusDailyCounter } from "../lib/bonus-daily-counter-dynamo.js";
 import type { BonusDailyCounter } from "../lib/bonus-daily-counter.js";
 import { DynamoReferralMonthlyCounter } from "../lib/referral-monthly-counter-dynamo.js";
 import type { ReferralMonthlyCounter } from "../lib/referral-monthly-counter.js";
+import {
+  MockComplianceScreeningProvider,
+} from "../lib/compliance-screening-mock.js";
+import type { ComplianceScreeningProvider } from "../lib/compliance-screening.js";
 import { payments } from "./payments.js";
 import { wallet } from "./wallet.js";
 import { tier } from "./tier.js";
@@ -86,6 +90,9 @@ export interface AppContext {
   bonusDailyCounter: BonusDailyCounter;
   // PR 2e — Referral monthly counter (closes OPL-LIB-009)
   referralMonthlyCounter: ReferralMonthlyCounter;
+  // PR 4b — Compliance screening provider (closes OPL-COMP-018, OPL-COMP-019)
+  // Currently MockComplianceScreeningProvider — swap to ComplyAdvantage when operator commits to $$$.
+  complianceScreeningProvider: ComplianceScreeningProvider;
 }
 
 let appContext: AppContext | null = null;
@@ -189,6 +196,15 @@ export const handler = async (event: unknown, context: unknown): Promise<unknown
 
       // PR 2e — referral monthly counter (closes OPL-LIB-009)
       referralMonthlyCounter: new DynamoReferralMonthlyCounter(docClient, Res.ReferralMonthlyCounterTable.name),
+
+      // PR 4b — compliance screening (closes OPL-COMP-018 PEP + OPL-COMP-019 sanctions)
+      // Currently MockComplianceScreeningProvider (no external API, no $$$).
+      // To enable ComplyAdvantage production: replace with
+      //   new ComplyAdvantageComplianceScreeningProvider({
+      //     apiKey: Res.ComplyAdvantageApiKey.value,
+      //   })
+      // See compliance-screening-complyadvantage.ts for the production skeleton.
+      complianceScreeningProvider: new MockComplianceScreeningProvider(),
 
       // PR 2a — wire transact wrapper from PR 1.2 into routes
       // Closes: OPL-API-001, OPL-CARD-003, OPL-API-011, OPL-LIB-002,
