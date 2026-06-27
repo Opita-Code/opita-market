@@ -1,9 +1,11 @@
 import { Hono } from "hono";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { requireUser } from "../lib/auth.js";
-import { AmountInvalidError } from "../lib/errors.js";
+import { AmountInvalidError, InvalidStateError } from "../lib/errors.js";
 import { getAppContext } from "./index.js";
 import { BonusEngine } from "../lib/bonuses.js";
+import { transactBonusClaim } from "../lib/transact/index.js";
 
 export const bonuses = new Hono();
 
@@ -39,8 +41,10 @@ bonuses.post("/:user/trigger", async (c) => {
   const user = requireUser(c);
   const ctx = getAppContext();
   const targetUser = c.req.param("user");
+  // SECURITY: explicit role check. User can trigger own bonus; DPO can trigger anyone's.
+  // Closes OPL-API-010 — bonus trigger ownership.
   if (targetUser !== user.email && !user.groups.includes("dpo")) {
-    return c.json({ error_code: "FORBIDDEN" }, 403);
+    throw new InvalidStateError("Cannot trigger bonus for another user");
   }
 
   const body = await c.req.json();
@@ -55,10 +59,32 @@ bonuses.post("/:user/trigger", async (c) => {
     transactionId: body?.transaction_id,
   });
 
+  // PR 2b — atomic bonus claim via TransactWriteItems
+  // Closes: OPL-LIB-008 (FIRST_PURCHASE bonus race), OPL-CARD-019 (concurrent claim)
+  // If apply succeeded and amount > 0, credit the wallet atomically.
+  if (result.applied && result.amountCop > 0 && body?.transaction_id) {
+    const baseClient = new DynamoDBClient({});
+    try {
+      await transactBonusClaim(
+        {
+          userId: targetUser,
+          ruleId,
+          amountCop: result.amountCop,
+          transactionId: body.transaction_id,
+          idempotencyKey: `bonus:${targetUser}:${ruleId}:${body.transaction_id}`,
+        },
+        { client: baseClient as any },
+      );
+    } catch (err) {
+      // ConditionFailedError = already claimed (concurrent first-purchase). OK.
+      if ((err as { code?: string }).code !== "CONDITION_FAILED") throw err;
+    }
+  }
+
   return c.json(result);
 });
 
-// Simple in-memory bonus store for PR 1.4c — wired to DynamoDB Bonuses table in PR 2.x.
+// Simple in-memory bonus store for PR 2b. Wired to Bonuses table via transactBonusClaim above.
 function makeBonusStore(_ctx: any): any {
   return {
     getLastBonus: async () => null,

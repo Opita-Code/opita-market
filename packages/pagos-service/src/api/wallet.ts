@@ -5,7 +5,7 @@ import { requireUser } from "../lib/auth.js";
 import { InvalidStateError, InsufficientBalanceError, AmountInvalidError, WithdrawHoldNotElapsedError, TierLimitExceededError } from "../lib/errors.js";
 import { getAppContext } from "./index.js";
 import { TIERS, withdrawHoldFor, isValidTier, type Tier } from "../lib/tiers.js";
-import { transactP2PTransfer } from "../lib/transact/index.js";
+import { transactP2PTransfer, transactDebitWallet } from "../lib/transact/index.js";
 import { randomUUID } from "node:crypto";
 
 export const wallet = new Hono();
@@ -108,6 +108,7 @@ wallet.post("/:user/withdraw", async (c) => {
   const tier: Tier = isValidTier(rawTier) ? rawTier : 0;
   const lifetimeWithdrawn = w?.lifetime_withdrawn_cop ?? 0;
 
+  // Pre-checks: balance + tier limit + hold (give user-friendly errors before atomic write)
   if (balance < amount) {
     throw new InsufficientBalanceError(`Insufficient balance: ${balance} < ${amount}`, balance, amount);
   }
@@ -136,7 +137,17 @@ wallet.post("/:user/withdraw", async (c) => {
     throw new InvalidStateError("Payouts are paused (emergency kill-switch active)");
   }
 
-  // PR 2.x: use transactDebitWallet from PR 1.2 (closes OPL-API-011 race + OPL-LIB-002 TOCTOU)
+  // PR 2b — atomic debit via TransactWriteItems (closes OPL-API-011 race + OPL-LIB-002 TOCTOU)
+  // Even if balance check passes here, atomic condition in transactDebitWallet
+  // prevents concurrent withdrawals from over-drawing.
+  const baseClient = new DynamoDBClient({});
+  const idempotencyKey = `wd:${targetUser}:${Date.now()}:${randomUUID().slice(0, 8)}`;
+  await transactDebitWallet(
+    { userId: targetUser, amountCop: amount, idempotencyKey },
+    { client: baseClient as any },
+  );
+
+  // PR 2.x: call Wompi disbursement API after atomic debit
   return c.json({
     withdrawal_id: `wd-${randomUUID()}`,
     status: "PROCESSING",
@@ -159,6 +170,21 @@ wallet.post("/:user/transfer", async (c) => {
   if (!toUserId) throw new AmountInvalidError("to_user_id is required");
   if (!Number.isInteger(amount) || amount <= 0) {
     throw new AmountInvalidError("amount_cop must be a positive integer");
+  }
+  if (toUserId === fromUserId) {
+    throw new InvalidStateError("Cannot transfer to yourself");
+  }
+
+  // SECURITY: verify recipient exists before atomic transfer.
+  // Closes OPL-API-005 — to_user_id from body (IDOR / arbitrary credits).
+  const recipientLookup = await ctx.dynamoClient.send(
+    new GetCommand({
+      TableName: ctx.walletsTable,
+      Key: { user_id: toUserId },
+    }),
+  );
+  if (!recipientLookup.Item) {
+    throw new InvalidStateError("Recipient wallet not found");
   }
 
   // PR 2a — atomic P2P transfer via TransactWriteItems

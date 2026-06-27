@@ -1,8 +1,10 @@
 import { Hono } from "hono";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { getAppContext } from "./index.js";
 import { InvalidSignatureError, EvidenceRequiredError } from "../lib/errors.js";
 import { EscrowStateMachine } from "../lib/escrow.js";
+import { transactEscrowTransition } from "../lib/transact/index.js";
 
 export const delivery = new Hono();
 
@@ -72,20 +74,27 @@ delivery.post("/confirm", async (c) => {
     throw new InvalidSignatureError(`State machine error: ${updated.error}`);
   }
 
-  // Update transaction (use UpdateCommand, not inline — closes pre-existing TS2353)
-  await ctx.dynamoClient.send(
-    new UpdateCommand({
-      TableName: ctx.transactionsTable,
-      Key: { transaction_id: txId },
-      UpdateExpression: "SET escrow_state = :s, escrow_released_at = :r, dispute_window_ends_at = :d, updated_at = :now",
-      ExpressionAttributeValues: {
-        ":s": updated.escrow_state,
-        ":r": updated.escrow_released_at,
-        ":d": updated.dispute_window_ends_at,
-        ":now": new Date().toISOString(),
+  // PR 2b — atomic state transition via TransactWriteItems (closes OPL-LIB-012 race)
+  // Prevents concurrent DELIVERY_CONFIRM + DISPUTE from both succeeding.
+  // We use the OLD escrow_state (the read we just did) in the condition.
+  const baseClient = new DynamoDBClient({});
+  try {
+    await transactEscrowTransition(
+      {
+        txId,
+        fromState: tx.escrow_state ?? "NONE",
+        toState: (updated.escrow_state as any) ?? "RELEASED",
+        idempotencyKey: `delivery:${txId}:${Date.now()}`,
       },
-    }),
-  );
+      { client: baseClient as any },
+    );
+  } catch (err) {
+    if ((err as { code?: string }).code === "CONDITION_FAILED") {
+      // Concurrent state transition (e.g., dispute won) — operation rejected atomically.
+      throw new InvalidSignatureError("State conflict: transaction moved to a different state");
+    }
+    throw err;
+  }
 
   return c.json({
     escrow_state: updated.escrow_state,

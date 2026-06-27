@@ -37,7 +37,9 @@ payments.post("/intent", async (c) => {
   if (!ALLOWED_CHANNELS.includes(channel)) {
     throw new ChannelNotAllowedError(`Invalid channel: ${channel}`);
   }
-  const fromUserId = String(body?.from_user_id ?? user.email);
+  // SECURITY: Always derive sender from auth context, NEVER accept from body.
+  // Closes OPL-API-003 — from_user_id override (IDOR / mass assignment).
+  const fromUserId = user.email;
   const toUserId = String(body?.to_user_id ?? "");
   const productContext = body?.product_context;
   const idempotencyKey = String(body?.idempotency_key ?? "");
