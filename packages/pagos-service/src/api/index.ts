@@ -35,6 +35,9 @@ import {
 import type { ComplianceScreeningProvider } from "../lib/compliance-screening.js";
 import { DynamoOppositionStore } from "../lib/habeas-data-dynamo.js";
 import type { OppositionStore } from "../lib/habeas-data.js";
+
+// PR 3 — security headers (closes OPL-API-008)
+import { buildSecurityHeaders } from "../lib/security-headers.js";
 import { payments } from "./payments.js";
 import { wallet } from "./wallet.js";
 import { tier } from "./tier.js";
@@ -112,6 +115,20 @@ export function getAppContext(): AppContext {
 
 export function createApp(): Hono {
   const app = new Hono();
+
+  // PR 3 — Security headers middleware (closes OPL-API-008)
+  // Applied to ALL responses (health, /v1/*, errors).
+  app.use("*", async (c, next) => {
+    await next();
+    const isProduction = process.env.NODE_ENV === "production";
+    const headers = buildSecurityHeaders({
+      isProduction,
+      isDev: !isProduction,
+    });
+    for (const [name, value] of Object.entries(headers)) {
+      c.header(name, value);
+    }
+  });
 
   // Health endpoint (no auth) — minimal info, no service name leak
   app.get("/health", (c) => c.json({ status: "ok" }));

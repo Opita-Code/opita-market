@@ -3,7 +3,16 @@
  *
  * Uses the browser's native fetch (no axios, no SWR for PR 7 — keep deps small).
  * Components pass cookies automatically via `credentials: "include"`.
+ *
+ * PR 3 — closes MW-FE-005: state-mutating requests now send X-CSRF-Token
+ * header (double-submit cookie pattern). Backend validates the token
+ * matches the __csrf-token cookie using constant-time comparison.
  */
+
+import {
+  CSRF_HEADER_NAME,
+  readCsrfTokenFromCookie,
+} from "./csrf-token";
 
 const DEFAULT_BASE_URL = "https://api.opitacode.com/pagos";
 const LOCAL_BASE_URL = "http://localhost:8080";
@@ -14,6 +23,19 @@ function getBaseUrl(): string {
     return LOCAL_BASE_URL;
   }
   return DEFAULT_BASE_URL;
+}
+
+/** Methods that mutate state — require CSRF token. */
+const STATE_MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/** Read CSRF token from browser cookies (if state-mutating request). */
+function getCsrfHeader(method: string): Record<string, string> {
+  if (!STATE_MUTATING_METHODS.has(method.toUpperCase())) return {};
+  if (typeof document === "undefined") return {};
+  const cookieHeader = document.cookie || null;
+  const token = readCsrfTokenFromCookie(cookieHeader);
+  if (!token) return {};
+  return { [CSRF_HEADER_NAME]: token };
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -86,11 +108,15 @@ export class ApiClientError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${getBaseUrl()}${path}`;
+  const method = (init.method ?? "GET").toString();
+  // PR 3 — include CSRF token on state-mutating requests
+  const csrfHeaders = getCsrfHeader(method);
   const response = await fetch(url, {
     ...init,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...csrfHeaders,
       ...(init.headers ?? {}),
     },
   });

@@ -1,25 +1,42 @@
 /**
- * Legal secrets — SST Secret lookups for the PTD / Aviso de Privacidad pages.
+ * legal-secrets.ts — Legal page substitutions (PTD + Aviso de Privacidad)
  *
- * Per compliance-foundation PR 4.5: all personal data shown on the public
- * legal pages comes from SST Secrets injected at deploy time. Nothing
- * personal is hardcoded in `.md` / `.astro` / `.ts` git-tracked files.
+ * Two-tier lookup strategy:
  *
- * Six secrets are referenced (set up via `scripts/setup-secrets.sh`):
- *   RazonSocial   → PTD_RAZON_SOCIAL
- *   Nit           → PTD_NIT
- *   Direccion     → PTD_DIRECCION
- *   RepLegal      → PTD_REP_LEGAL
- *   EmailPublico  → PTD_EMAIL_PUBLICO
- *   DpoEmail      → PTD_DPO_EMAIL  (NEVER rendered publicly — DPO dashboard only)
+ *  1. **Generated constants** from `scripts/build.js` (BUILD TIME)
+ *     The build wrapper reads .env + wrangler.toml [vars] and writes the
+ *     resolved values to `src/lib/legal-secrets.generated.ts` as TS
+ *     constants. esbuild then INLINES these as literal values in the
+ *     bundle. This makes the substitutions work in BOTH:
+ *       - The Astro content-collection data layer (compiled at build time)
+ *       - The Cloudflare Workers runtime (per-request rendering)
  *
- * Tokens referenced inside markdown / frontmatter: {{RAZON_SOCIAL}},
- * {{NIT}}, {{DIRECCION}}, {{REP_LEGAL}}, {{EMAIL_PUBLICO}}, {{DPO_EMAIL}}.
- * The remark plugin (`remark-substitute-legal-placeholders.ts`) does the
- * body substitution at AST level so Astro's markdown pipeline still
- * processes the substituted text normally. The same helper handles
- * frontmatter / component-level substitution in `[slug].astro`.
+ *  2. **Runtime fallback** via `import.meta.env` (PUBLIC_PTD_* vars) for
+ *     dev hot-reload scenarios where the generated module is stale.
+ *
+ *  3. **Loud fallback**: missing values → "[Pendiente: configurar <Name>]"
+ *     so config errors are loud, never silent.
+ *
+ * Token catalogue (substituted as {{TOKEN}} in markdown bodies):
+ *   RAZON_SOCIAL, NIT, DIRECCION, REP_LEGAL, EMAIL_PUBLICO, DPO_EMAIL
+ *
+ * Mirrors the SST Secrets that previously fed these values via
+ * sst.config.ts (legalRazonSocial.value, legalNit.value, etc.).
+ *
+ * IMPORTANT: never log the resolved value. DPO_EMAIL is private.
  */
+
+// Build-time generated constants (overwritten by scripts/build.js on each build)
+// PR 3 — closes MW-FE-008: PTD_DPO_EMAIL is NO LONGER bundled.
+// DPO contact is fetched at runtime via /api/legal/dpo-contact.
+import {
+  PTD_RAZON_SOCIAL as GEN_PTD_RAZON_SOCIAL,
+  PTD_NIT as GEN_PTD_NIT,
+  PTD_DIRECCION as GEN_PTD_DIRECCION,
+  PTD_REP_LEGAL as GEN_PTD_REP_LEGAL,
+  PTD_EMAIL_PUBLICO as GEN_PTD_EMAIL_PUBLICO,
+  getDpoContactUrl,
+} from "./legal-secrets.generated";
 
 export const LEGAL_TOKENS = [
   "RAZON_SOCIAL",
@@ -31,39 +48,57 @@ export const LEGAL_TOKENS = [
 ] as const;
 
 export type LegalToken = (typeof LEGAL_TOKENS)[number];
-
 export type LegalSecrets = Record<LegalToken, string>;
 
 /**
- * Read a secret from process.env. Falls back to a clearly-marked
- * "Pendiente" marker so missing configuration is loud, never silent.
+ * Resolve a secret. Order:
+ *   1. Build-time generated constant (esbuild-inlined) — always wins
+ *      unless empty
+ *   2. import.meta.env.PUBLIC_<NAME> (Vite-inlined at build time, dev hot-reload)
+ *   3. process.env.<NAME> (Node.js only — works in astro build context)
+ *   4. "[Pendiente: configurar <Name>]"  ← loud fallback, never silent
  *
  * IMPORTANT: never echo the resolved value back to logs.
  */
-function readSecret(envName: string, secretName: string): string {
-  const v = process.env[envName];
+function readSecret(
+  generated: string | undefined,
+  publicName: string,
+  processName: string,
+  secretName: string,
+): string {
+  // 1. Generated constant (preferred)
+  if (typeof generated === "string" && generated.length > 0) return generated;
+  // 2. import.meta.env (Vite-inlined PUBLIC_* in dev)
+  try {
+    const v = (import.meta as any).env?.[publicName];
+    if (typeof v === "string" && v.length > 0) return v;
+  } catch {
+    // import.meta.env not available
+  }
+  // 3. process.env (Node.js only)
+  const v = process.env[processName];
   if (typeof v === "string" && v.length > 0) return v;
+  // 4. Loud fallback
   return `[Pendiente: configurar ${secretName}]`;
 }
 
 export function getLegalSecrets(): LegalSecrets {
+  // PR 3 — DPO_EMAIL is now resolved at runtime via API, NOT bundled.
+  // getDpoContactUrl() returns a same-origin URL that returns the
+  // current DPO contact (form URL or alias — operator may rotate).
   return {
-    RAZON_SOCIAL: readSecret("PTD_RAZON_SOCIAL", "RazonSocial"),
-    NIT: readSecret("PTD_NIT", "Nit"),
-    DIRECCION: readSecret("PTD_DIRECCION", "Direccion"),
-    REP_LEGAL: readSecret("PTD_REP_LEGAL", "RepLegal"),
-    EMAIL_PUBLICO: readSecret("PTD_EMAIL_PUBLICO", "EmailPublico"),
-    DPO_EMAIL: readSecret("PTD_DPO_EMAIL", "DpoEmail"),
+    RAZON_SOCIAL: readSecret(GEN_PTD_RAZON_SOCIAL, "PUBLIC_PTD_RAZON_SOCIAL", "PTD_RAZON_SOCIAL", "RazonSocial"),
+    NIT: readSecret(GEN_PTD_NIT, "PUBLIC_PTD_NIT", "PTD_NIT", "Nit"),
+    DIRECCION: readSecret(GEN_PTD_DIRECCION, "PUBLIC_PTD_DIRECCION", "PTD_DIRECCION", "Direccion"),
+    REP_LEGAL: readSecret(GEN_PTD_REP_LEGAL, "PUBLIC_PTD_REP_LEGAL", "PTD_REP_LEGAL", "RepLegal"),
+    EMAIL_PUBLICO: readSecret(GEN_PTD_EMAIL_PUBLICO, "PUBLIC_PTD_EMAIL_PUBLICO", "PTD_EMAIL_PUBLICO", "EmailPublico"),
+    DPO_EMAIL: getDpoContactUrl(), // PR 3 — API-resolved, not bundled
   };
 }
 
 /**
- * Replace every `{{TOKEN}}` in `s` with the corresponding SST Secret
- * value (or "Pendiente" marker if the secret is not set).
- *
- * Used by:
- *   - the remark plugin (body text substitution at AST level)
- *   - `[slug].astro` (frontmatter values like `summary` / `contact_email`)
+ * Replace every `{{TOKEN}}` in `s` with the corresponding secret value
+ * (or "Pendiente" marker if the secret is not set).
  */
 export function substitute(s: string | undefined | null): string {
   if (!s) return s ?? "";

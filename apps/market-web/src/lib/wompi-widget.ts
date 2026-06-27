@@ -5,10 +5,14 @@
  * and renders its own checkout UI. We inject the tag with the integrity
  * signature from POST /v1/payments/intent.
  *
+ * PR 3 — closes MW-FE-002: NOW includes Subresource Integrity (SRI)
+ * hash + crossOrigin="anonymous" so the browser verifies the script
+ * has not been tampered with (prevents MITM payment-data exfiltration).
+ *
  * Spec: https://docs.wompi.co/en/docs/colombia/widget-checkout-web/
  */
 
-const WOMPI_WIDGET_URL = "https://checkout.wompi.co/widget.js";
+import { WOMPI_SRI_HASH, WOMPI_WIDGET_URL } from "./wompi-sri";
 
 export interface WompiWidgetConfig {
   publicKey: string;
@@ -24,6 +28,9 @@ export interface WompiWidgetConfig {
 /**
  * Inject the Wompi widget script into the container.
  * Idempotent: calling twice in the same container is a no-op.
+ *
+ * Includes SRI integrity hash + crossOrigin="anonymous" to defend
+ * against MITM substitution attacks.
  */
 export function injectWompiWidget(config: WompiWidgetConfig): HTMLScriptElement | null {
   // Check if already injected (avoid duplicates)
@@ -33,6 +40,11 @@ export function injectWompiWidget(config: WompiWidgetConfig): HTMLScriptElement 
 
   const script = document.createElement("script");
   script.src = WOMPI_WIDGET_URL;
+  // PR 3 (closes MW-FE-002): Subresource Integrity hash + crossOrigin
+  // Browser will refuse to execute if hash mismatches. NOTE: operator
+  // must replace WOMPI_SRI_HASH placeholder with official Wompi-published hash.
+  script.integrity = WOMPI_SRI_HASH;
+  script.crossOrigin = "anonymous";
   script.setAttribute("data-render", "button");
   script.setAttribute("data-public-key", config.publicKey);
   script.setAttribute("data-currency", config.currency);
