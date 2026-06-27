@@ -71,20 +71,32 @@ function readCurrentValue() {
 }
 
 function setNewValue(value) {
-  // Use spawnSync to avoid shell-quoting issues + prevent value from
-  // appearing in process listings.
+  // Use spawnSync with all stdio piped so we can capture + log stderr.
+  // Pipe the new value via stdin (avoids shell-quoting + process listing leak).
   const proc = spawnSync(
     "npx",
     ["sst", "secret", "set", SECRET_NAME, "--stage", STAGE],
     {
       input: value,
-      stdio: ["pipe", "inherit", "inherit"],
+      stdio: ["pipe", "pipe", "pipe"],
       encoding: "utf8",
     },
   );
   if (proc.status !== 0) {
-    throw new Error(`sst secret set failed: ${proc.stderr ?? "unknown"}`);
+    // Log full output for diagnosis
+    console.error("[rotate-wompi] --- sst secret set stdout ---");
+    console.error(proc.stdout ?? "(empty)");
+    console.error("[rotate-wompi] --- sst secret set stderr ---");
+    console.error(proc.stderr ?? "(empty)");
+    console.error("[rotate-wompi] --- exit code:", proc.status, "---");
+    throw new Error(
+      `sst secret set failed with exit code ${proc.status}. ` +
+        `Check AWS credentials (aws sts get-caller-identity) and that ` +
+        `stage '${STAGE}' exists in SST.`,
+    );
   }
+  // sst prints "Updated secret" on success
+  return proc.stdout ?? "";
 }
 
 function readNewKey() {
