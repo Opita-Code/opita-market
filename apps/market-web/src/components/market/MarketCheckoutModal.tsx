@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiClient, ApiClientError, type IntentRequest, type IntentResponse } from "../../lib/api-client";
 import { injectWompiWidget, removeWompiWidget } from "../../lib/wompi-widget";
 import { computeDeviceFingerprint } from "../../lib/device-fingerprint";
+import { formatFeeDisclosure, computeWompiFee } from "../../lib/wompi-fees";
 
 export interface MarketCheckoutModalProps {
   open: boolean;
@@ -141,11 +142,27 @@ export function MarketCheckoutModal(props: MarketCheckoutModalProps) {
 
         <div className="p-8">
           <h2 className="text-xl font-semibold text-slate-900 mb-2">Confirmar pago</h2>
-          <p className="text-sm text-slate-600 mb-6">
+          <p className="text-sm text-slate-600 mb-2">
             {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(props.amountCop)}
             {" · "}
             {props.channel.replace("WOMPI_", "")}
           </p>
+          {/* PR 10 (closes OPL-COMP-020, HIGH) — Wompi processing fee disclosure.
+              SIC Circular 02/2022 prohibits hidden fees; this line is shown
+              before the widget redirect so the user consents to the full
+              amount they'll be charged. Hidden when channel is Bre-B (free). */}
+          {formatFeeDisclosure(props.amountCop, props.channel) && (
+            <p
+              data-testid="wompi-fee-disclosure"
+              className="text-xs text-slate-500 mb-6"
+            >
+              {formatFeeDisclosure(props.amountCop, props.channel)}
+            </p>
+          )}
+          {/* Spacer only when no fee disclosure (Bre-B) — keep layout consistent */}
+          {formatFeeDisclosure(props.amountCop, props.channel) === "" && (
+            <div className="mb-6" />
+          )}
 
           {state.kind === "loading" && (
             <div data-testid="loading" className="py-8 text-center text-slate-500">

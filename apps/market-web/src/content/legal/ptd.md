@@ -25,9 +25,9 @@ contact_email: "{{EMAIL_PUBLICO}}"
 | NIT | {{NIT}} |
 | Dirección | {{DIRECCION}} |
 | Correo electrónico | {{EMAIL_PUBLICO}} |
-| Teléfono | *(Pendiente de constitución — sin línea asignada aún)* |
+| Teléfono | {{TELEFONO}} |
 | Representante legal | {{REP_LEGAL}} |
-| Oficial de Protección de Datos (DPO) | contacto privado disponible bajo solicitud a {{EMAIL_PUBLICO}} |
+| Oficial de Protección de Datos (DPO) | contacto privado disponible bajo solicitud a {{EMAIL_PUBLICO}} o {{TELEFONO}} |
 
 El responsable del tratamiento es la persona jurídica que decide sobre
 la base de datos y/o el tratamiento de los datos personales. En este

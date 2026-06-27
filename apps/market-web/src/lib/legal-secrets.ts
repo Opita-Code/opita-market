@@ -18,7 +18,7 @@
  *     so config errors are loud, never silent.
  *
  * Token catalogue (substituted as {{TOKEN}} in markdown bodies):
- *   RAZON_SOCIAL, NIT, DIRECCION, REP_LEGAL, EMAIL_PUBLICO, DPO_EMAIL
+ *   RAZON_SOCIAL, NIT, DIRECCION, REP_LEGAL, EMAIL_PUBLICO, DPO_EMAIL, TELEFONO
  *
  * Mirrors the SST Secrets that previously fed these values via
  * sst.config.ts (legalRazonSocial.value, legalNit.value, etc.).
@@ -35,6 +35,7 @@ import {
   PTD_DIRECCION as GEN_PTD_DIRECCION,
   PTD_REP_LEGAL as GEN_PTD_REP_LEGAL,
   PTD_EMAIL_PUBLICO as GEN_PTD_EMAIL_PUBLICO,
+  PTD_TELEFONO as GEN_PTD_TELEFONO,
   getDpoContactUrl,
 } from "./legal-secrets.generated";
 
@@ -45,6 +46,7 @@ export const LEGAL_TOKENS = [
   "REP_LEGAL",
   "EMAIL_PUBLICO",
   "DPO_EMAIL",
+  "TELEFONO",
 ] as const;
 
 export type LegalToken = (typeof LEGAL_TOKENS)[number];
@@ -93,6 +95,9 @@ export function getLegalSecrets(): LegalSecrets {
     REP_LEGAL: readSecret(GEN_PTD_REP_LEGAL, "PUBLIC_PTD_REP_LEGAL", "PTD_REP_LEGAL", "RepLegal"),
     EMAIL_PUBLICO: readSecret(GEN_PTD_EMAIL_PUBLICO, "PUBLIC_PTD_EMAIL_PUBLICO", "PTD_EMAIL_PUBLICO", "EmailPublico"),
     DPO_EMAIL: getDpoContactUrl(), // PR 3 — API-resolved, not bundled
+    // PR 10 (closes OPL-COMP-001, HIGH): DPO / company phone (Ley 1581 Art. 13).
+    // Operator MUST set a real number before go-live (placeholder is loud).
+    TELEFONO: readSecret(GEN_PTD_TELEFONO, "PUBLIC_PTD_TELEFONO", "PTD_TELEFONO", "Telefono"),
   };
 }
 
