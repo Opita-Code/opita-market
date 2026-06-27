@@ -156,7 +156,7 @@ payments.post("/webhook", async (c) => {
     transactCredit: ctx.transactCredit,
     transactTransition: ctx.transactTransition,
     transactReverseBonus: ctx.transactReverseBonus,
-    resolveUserFromReference: ctx.resolveUserFromReference,
+      resolveUserFromReference: async (ref) => (await ctx.resolveUserFromReference(ref)) ?? "",
   });
 
   return c.json({

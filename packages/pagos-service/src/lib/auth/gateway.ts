@@ -24,14 +24,14 @@ import { verifyJwt } from "./jwt.js";
 import { RATE_LIMITS } from "./rate-limit.js";
 import type { AuthContext, AuthGatewayDeps, AuthMethod, Role } from "./types.js";
 
-function extractToken(ctx: Context): string | null {
+function extractToken(ctx: Context): string | undefined {
   const auth = ctx.req.header("authorization");
   if (auth?.startsWith("Bearer ")) return auth.slice(7);
   const cookie = ctx.req.header("cookie");
-  if (!cookie) return null;
+  if (!cookie) return undefined;
   // Parse __opita_session=<token> from cookie header
   const match = cookie.match(/(?:^|;\s*)__opita_session=([^;]+)/);
-  return match ? match[1] : null;
+  return match ? match[1] : undefined;
 }
 
 function getIp(ctx: Context): string {
@@ -52,7 +52,7 @@ function tryDevBypass(ctx: Context): AuthContext | null {
     groups,
     deviceId: ctx.req.header("x-device-id") ?? undefined,
     ip: getIp(ctx),
-    authMethod: "dev-bypass" as AuthMethod,
+    authMethod: "dev-bypass",
   };
 }
 
