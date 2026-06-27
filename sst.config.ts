@@ -173,14 +173,19 @@ export default $config({
     //     GSIs:
     //       - Transactions: IdempotencyKeyIndex, WompiTxIdIndex, StatusUpdatedAtIndex
     //       - Referrals: RefereeUserIdIndex (for qualifyOnAction)
+    //
+    //     NOTE: SST v4 aws.Dynamo requires every declared field to be in
+    //     a primary or GSI index. Non-indexed fields (e.g., amount_cop,
+    //     type, balance_cop) are NOT declared — they're stored as
+    //     schemaless attributes via UpdateCommand.ExpressionAttributeValues.
     // ====================================================================
     const walletsTable = new sst.aws.Dynamo("WalletsTable", {
-      fields: { user_id: "string", balance_cop: "number", version: "number", tier: "number", updated_at: "string" },
+      fields: { user_id: "string" },
       primaryIndex: { hashKey: "user_id" },
     });
 
     const ledgerTable = new sst.aws.Dynamo("LedgerTable", {
-      fields: { user_id: "string", ts_seq: "string", amount_cop: "number", type: "string" },
+      fields: { user_id: "string", ts_seq: "string" },
       primaryIndex: { hashKey: "user_id", rangeKey: "ts_seq" },
     });
 
@@ -189,13 +194,7 @@ export default $config({
         transaction_id: "string",
         idempotency_key: "string",
         wompi_tx_id: "string",
-        user_from: "string",
-        user_to: "string",
-        amount_cop: "number",
         status: "string",
-        escrow_state: "string",
-        escrow_version: "number",
-        created_at: "string",
         updated_at: "string",
       },
       primaryIndex: { hashKey: "transaction_id" },
@@ -207,7 +206,7 @@ export default $config({
     });
 
     const referralsTable = new sst.aws.Dynamo("ReferralsTable", {
-      fields: { referrer_user_id: "string", referee_user_id: "string", code: "string", status: "string", created_at: "string" },
+      fields: { referrer_user_id: "string", referee_user_id: "string", code: "string" },
       primaryIndex: { hashKey: "referrer_user_id", rangeKey: "referee_user_id" },
       globalIndexes: {
         RefereeUserIdIndex: { hashKey: "referee_user_id" },
@@ -216,18 +215,18 @@ export default $config({
     });
 
     const bonusesTable = new sst.aws.Dynamo("BonusesTable", {
-      fields: { user_id: "string", rule_id: "string", transaction_id: "string", amount_cop: "number", claimed_at: "string" },
+      fields: { user_id: "string", rule_id: "string" },
       primaryIndex: { hashKey: "user_id", rangeKey: "rule_id" },
     });
 
     const ipGeoCacheTable = new sst.aws.Dynamo("IpGeoCacheTable", {
-      fields: { ip: "string", country_iso: "string", is_tor: "number", is_vpn: "number", ttl_epoch: "number" },
+      fields: { ip: "string" },
       primaryIndex: { hashKey: "ip" },
       ttl: "ttl_epoch",
     });
 
     const fraudSignalsTable = new sst.aws.Dynamo("FraudSignalsTable", {
-      fields: { signal_id: "string", user_id: "string", decision: "string", created_at: "string", ttl_epoch: "number" },
+      fields: { signal_id: "string", user_id: "string", created_at: "string" },
       primaryIndex: { hashKey: "signal_id" },
       globalIndexes: {
         UserHistoryIndex: { hashKey: "user_id", rangeKey: "created_at" },
@@ -236,7 +235,7 @@ export default $config({
     });
 
     const processedWebhooksTable = new sst.aws.Dynamo("ProcessedWebhooksTable", {
-      fields: { event_id: "string", tx_id: "string", processed_at: "string", ttl_epoch: "number" },
+      fields: { event_id: "string" },
       primaryIndex: { hashKey: "event_id" },
       ttl: "ttl_epoch",
     });
