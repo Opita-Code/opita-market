@@ -6,8 +6,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Pending
-- Replace static PNG covers with UGC `<video>` clips once MiniMax video quota resets (~96 min)
-- Wire new 9:16 hands-focused keyframes to replace legacy 16:9 hero PNGs
+- Replace static PNG covers with UGC `<video>` clips once MiniMax video quota resets
+- Add `<video autoplay loop muted playsinline poster>` support to FeedCard when videos arrive
+
+---
+
+## [v0.1.0-demo-2] — 2026-06-28
+
+### Changed
+- **Replaced 4 vertical hero illustrations** with 9:16 brand-aligned keyframes generated via MiniMax Director Pipeline (hands-focused, hyper-specific Colombian characters, warm earth-tone palette, upper-left golden-hour sun).
+  - `foods.jpg` (720x1280): María, 60s, hands placing steaming lechona in Huila kitchen with terracotta tiles + aguadepanela mug
+  - `barber.jpg` (720x1280): Don Hernán, 52s, clippers trimming fade, sage-green painted window frame
+  - `beauty.jpg` (720x1280): Manicurista, 40s, gel polish brush touching fingertips, marble counter + monstera
+  - `hogar.jpg` (720x1280): Plumber, 40s, hands on pipe wrench under sink, scattered wrenches on floor
+- **Renamed `.png` → `.jpg`**: content is JPEG (downloaded from MiniMax OSS). Extension matches content. CF Pages now serves `Content-Type: image/jpeg` correctly.
+- **FeedShowcase.astro updated**: all 6 `videoSrc` references now point to `.jpg`. Same hash-keyed content delivery, no visual regression.
+
+### Notes
+- 4 images = 1.09 MB total (279+265+287+301 KB), all 9:16 vertical, JPEG quality ~85
+- CF Pages quirk discovered: requesting `.png` of a renamed asset returns 200 with same content + wrong CT (image/png). Doesn't break anything since FeedShowcase references `.jpg`, but worth noting for future asset renames.
+
+### Deployment
+- **Tag**: `v0.1.0-demo-2`
+- **Commit**: `8e770d8`
+- **Staging URL**: https://staging.opita-market-dev.pages.dev/demo (deployment alias: https://5e2c78f1.opita-market-dev.pages.dev)
 
 ---
 
