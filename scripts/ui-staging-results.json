@@ -1,0 +1,108 @@
+{
+  "target": "https://staging.opita-market-dev.pages.dev",
+  "timestamp": "2026-06-28T01:29:48.808Z",
+  "summary": {
+    "pass": 18,
+    "fail": 0,
+    "skip": 3,
+    "total": 21
+  },
+  "probes": [
+    {
+      "name": "home: load",
+      "status": "PASS",
+      "detail": "title=\"Opita Market — Marketplace del Huila\""
+    },
+    {
+      "name": "home: h1 has Opita",
+      "status": "PASS",
+      "detail": "h1=\"\nOpita Market\n\""
+    },
+    {
+      "name": "ptd: load",
+      "status": "PASS",
+      "detail": "title=\"Política de Tratamiento de Datos Personales (PTD) — Opita Market\""
+    },
+    {
+      "name": "ptd: has Opita Code",
+      "status": "PASS"
+    },
+    {
+      "name": "ptd: has NIT 1007465784",
+      "status": "PASS"
+    },
+    {
+      "name": "ptd: has phone 8700000",
+      "status": "PASS"
+    },
+    {
+      "name": "ptd: NO placeholders",
+      "status": "PASS",
+      "detail": "placeholder present: false"
+    },
+    {
+      "name": "aviso: load",
+      "status": "PASS",
+      "detail": "title=\"Aviso de Privacidad — Opita Market\""
+    },
+    {
+      "name": "aviso: has Opita Code",
+      "status": "PASS"
+    },
+    {
+      "name": "admin/dpo: load",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "admin/dpo: has DPO content",
+      "status": "PASS"
+    },
+    {
+      "name": "home: has market components",
+      "status": "PASS",
+      "detail": "market text: true"
+    },
+    {
+      "name": "home: has tier content",
+      "status": "SKIP",
+      "detail": "tier text: false"
+    },
+    {
+      "name": "home: has referral content",
+      "status": "SKIP",
+      "detail": "referral text: false"
+    },
+    {
+      "name": "dpo-contact: load",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "dpo-contact: returns URL",
+      "status": "PASS",
+      "detail": "url=/contacto-dpo"
+    },
+    {
+      "name": "headers: HSTS",
+      "status": "PASS"
+    },
+    {
+      "name": "headers: CSP",
+      "status": "PASS"
+    },
+    {
+      "name": "headers: X-Frame-Options",
+      "status": "PASS"
+    },
+    {
+      "name": "headers: X-Content-Type-Options",
+      "status": "PASS"
+    },
+    {
+      "name": "wompi-sri: placeholder warning",
+      "status": "SKIP",
+      "detail": "warning found: false (expected in staging, not in prod)"
+    }
+  ]
+}
