@@ -1,0 +1,63 @@
+---
+/**
+ * BentoCard — single card for BentoGrid.
+ *
+ * Usage:
+ *   <BentoCard span="lg" tone="brand">
+ *     <h3>...</h3>
+ *   </BentoCard>
+ */
+interface Props {
+  span?: "sm" | "md" | "lg" | "xl" | "full";
+  tone?: "default" | "brand" | "accent" | "sky" | "dark" | "warm";
+  border?: boolean;
+  interactive?: boolean;
+  class?: string;
+  id?: string;
+}
+
+const {
+  span = "md",
+  tone = "default",
+  border = true,
+  interactive = false,
+  class: className = "",
+  id,
+} = Astro.props;
+
+const spanClass: Record<NonNullable<Props["span"]>, string> = {
+  sm: "col-span-1 sm:row-span-1",
+  md: "col-span-1 sm:row-span-1",
+  lg: "col-span-1 sm:col-span-2 lg:row-span-2",
+  xl: "col-span-1 sm:col-span-2 lg:col-span-2",
+  full: "col-span-1 sm:col-span-2 lg:col-span-4",
+};
+
+const toneMap: Record<NonNullable<Props["tone"]>, string> = {
+  default: "bg-surface-elevated",
+  brand: "bg-gradient-to-br from-brand-50 to-accent-50/60",
+  accent: "bg-gradient-to-br from-accent-50 to-brand-50/60",
+  sky: "bg-gradient-to-br from-sky-50 to-accent-50/60",
+  dark: "bg-gradient-to-br from-ink-900 to-ink-800 text-ink-50",
+  warm: "bg-gradient-to-br from-brand-100/40 via-background to-accent-100/30",
+};
+
+const borderClass = border ? "border border-border" : "";
+const interactiveClass = interactive ? "card-hover cursor-pointer" : "";
+---
+
+<div
+  id={id}
+  class:list={[
+    "relative rounded-2xl p-6 lg:p-8 overflow-hidden",
+    toneMap[tone],
+    borderClass,
+    interactiveClass,
+    spanClass[span],
+    className,
+  ]}
+>
+  <div class:list={["relative h-full flex flex-col"]}>
+    <slot />
+  </div>
+</div>

@@ -1,0 +1,288 @@
+---
+/**
+ * DemoLayout — layout for the investor demo at /demo/*.
+ *
+ * Distinct from BaseLayout: includes demo-specific navbar with vertical
+ * navigation, Opita Saldo wallet widget in nav, and CTAs for "Empieza gratis".
+ * Keeps Habeas Data + DPO footer (per colombia-habeas-data skill).
+ *
+ * Loads web-visual-quality + colombia-conventions + opita-frontend-behavior chains.
+ */
+import "../styles/global.css";
+import Badge from "../components/demo/Badge.astro";
+import { VERTICALES } from "../lib/demo-data";
+import { SALDO_STUB } from "../lib/demo-algorithm";
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Hide the demo banner (e.g. for /demo/lobby/[slug]). */
+  hideBanner?: boolean;
+}
+
+const {
+  title,
+  description = "Opita Market — marketplace multi-vertical del Huila con precios publicados y datos verificados.",
+  hideBanner = false,
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://demo.market.opitacode.com").toString();
+
+const saldoFormatted = new Intl.NumberFormat("es-CO", {
+  style: "currency",
+  currency: "COP",
+  maximumFractionDigits: 0,
+}).format(SALDO_STUB.balance_cop);
+
+const opicoinsFormatted = SALDO_STUB.opicoins.toLocaleString("es-CO");
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_CO" />
+    <meta name="theme-color" content="#a85a32" />
+  </head>
+  <body class="bg-background text-ink-900 antialiased">
+    {/* Demo banner */}
+    {!hideBanner && (
+      <div class="bg-ink-900 text-ink-50 text-center py-2 text-xs sm:text-sm">
+        <span class="inline-flex items-center gap-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-warning animate-pulse"></span>
+          <strong>Versión demo para inversores</strong>
+          <span class="hidden sm:inline">— los datos son sintéticos pero las mecánicas son las reales</span>
+        </span>
+      </div>
+    )}
+
+    {/* Top navbar */}
+    <header class="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16 gap-4">
+          {/* Logo */}
+          <a href="/demo" class="flex items-center gap-2 group">
+            <img
+              src="/demo/logo/square.png"
+              alt="Opita Market"
+              width="36"
+              height="36"
+              class="w-9 h-9 rounded-lg object-cover shadow-sm group-hover:shadow transition-shadow"
+            />
+            <span class="hidden sm:inline text-lg font-bold text-ink-900 group-hover:text-brand-700 transition-colors">
+              Opita <span class="text-brand-600">Market</span>
+            </span>
+          </a>
+
+          {/* Vertical nav */}
+          <nav class="hidden md:flex items-center gap-1" aria-label="Verticales">
+            {Object.values(VERTICALES).map((v) => (
+              <a
+                href={`/demo/${v.slug}`}
+                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium text-ink-700 hover:text-ink-900 hover:bg-surface transition-colors"
+              >
+                <span aria-hidden="true">{v.emoji}</span>
+                {v.nombre.replace("Opita ", "")}
+              </a>
+            ))}
+          </nav>
+
+          {/* Right side */}
+          <div class="flex items-center gap-2">
+            {/* Wallet widget (stub) */}
+            <div class="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent-50 border border-accent-200">
+              <span class="text-xs text-accent-700 font-medium">💰 Saldo</span>
+              <span class="text-sm font-bold text-accent-900 tabular-nums">{saldoFormatted}</span>
+              <span class="text-xs text-accent-700">·</span>
+              <span class="text-xs text-accent-700 font-medium">{opicoinsFormatted} OpiCoins</span>
+            </div>
+
+            {/* Sign in */}
+            <a
+              href="/cuenta/login"
+              class="hidden sm:inline-flex text-sm font-medium text-ink-700 hover:text-ink-900 px-3 py-2"
+            >
+              Iniciar sesión
+            </a>
+
+            {/* Primary CTA */}
+            <a
+              href="/demo/foods"
+              class="inline-flex items-center gap-1.5 bg-brand-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-700 transition-colors shadow-sm"
+            >
+              Empieza gratis
+              <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    {/* Footer */}
+    <footer class="border-t border-border bg-gradient-to-b from-surface to-background mt-24">
+      {/* Pre-footer: investor CTA + newsletter */}
+      <div class="border-b border-border bg-ink-950 text-ink-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
+          <div class="grid lg:grid-cols-2 gap-10 items-center">
+            <div>
+              <Badge variant="brand">¿Eres inversor o aliado?</Badge>
+              <h3 class="text-2xl sm:text-3xl font-black mt-4 mb-3 text-balance">
+                Construyamos juntos la infraestructura del SMB colombiano.
+              </h3>
+              <p class="text-ink-300 text-sm sm:text-base leading-relaxed">
+                Estamos abriendo ronda Seed para Q3 2026. Si tienes thesis en marketplaces verticales, inclusión financiera o LATAM emerging markets, hablemos.
+              </p>
+              <div class="mt-6 flex flex-wrap gap-3">
+                <a
+                  href="mailto:investors@opita.market"
+                  class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors"
+                >
+                  Agendar llamada →
+                </a>
+                <a
+                  href="#"
+                  class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-ink-700 text-ink-100 font-semibold hover:bg-ink-800 transition-colors"
+                >
+                  Ver deck
+                </a>
+              </div>
+            </div>
+
+            {/* Newsletter */}
+            <form class="rounded-2xl bg-ink-900 border border-ink-700 p-6 sm:p-8" onsubmit="event.preventDefault(); alert('Demo: suscripción simulada.');">
+              <h4 class="text-base font-bold mb-1">Recibe las actualizaciones del piloto Huila</h4>
+              <p class="text-sm text-ink-300 mb-4">Una vez al mes. Métricas reales del piloto, no actualizaciones de marketing.</p>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="email"
+                  placeholder="tu@email.com"
+                  required
+                  class="flex-1 px-4 py-2.5 rounded-lg bg-ink-800 border border-ink-600 text-ink-50 placeholder:text-ink-500 focus:outline-none focus:border-brand-500"
+                />
+                <button
+                  type="submit"
+                  class="px-5 py-2.5 rounded-lg bg-accent-600 text-white font-semibold hover:bg-accent-700 transition-colors whitespace-nowrap"
+                >
+                  Suscribirme
+                </button>
+              </div>
+              <p class="text-xs text-ink-500 mt-3">Sin spam. Puedes darte de baja cuando quieras.</p>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* Main footer columns */}
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+        <div class="grid grid-cols-2 md:grid-cols-12 gap-8 mb-12">
+          {/* Brand + tagline */}
+          <div class="col-span-2 md:col-span-4">
+            <div class="flex items-center gap-2.5 mb-4">
+              <img
+                src="/demo/logo/square.png"
+                alt="Opita Market"
+                width="40"
+                height="40"
+                class="w-10 h-10 rounded-lg object-cover shadow-sm"
+              />
+              <span class="text-lg font-bold text-ink-900">Opita Market</span>
+            </div>
+            <p class="text-sm text-ink-600 leading-relaxed mb-5 max-w-sm">
+              La infraestructura de datos y marketplace para el SMB colombiano. Empezamos por las regiones donde nadie llega: precios verificados, negocios validados, pagos sin tarjeta.
+            </p>
+            {/* Trust badges row */}
+            <div class="flex flex-wrap gap-2">
+              <Badge variant="outline" size="xs">✓ Ley 1581</Badge>
+              <Badge variant="outline" size="xs">DPO</Badge>
+              <Badge variant="outline" size="xs">Auditada</Badge>
+              <Badge variant="outline" size="xs">Sandbox Wompi</Badge>
+            </div>
+          </div>
+
+          {/* Verticales */}
+          <div class="md:col-span-2">
+            <h4 class="text-xs font-bold text-ink-900 uppercase tracking-wider mb-4">Verticales</h4>
+            <ul class="space-y-2 text-sm">
+              {Object.values(VERTICALES).map((v) => (
+                <li>
+                  <a href={`/demo/${v.slug}`} class="text-ink-600 hover:text-brand-700 transition-colors inline-flex items-center gap-1.5">
+                    <span aria-hidden="true">{v.emoji}</span>
+                    {v.nombre.replace("Opita ", "")}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Producto */}
+          <div class="md:col-span-2">
+            <h4 class="text-xs font-bold text-ink-900 uppercase tracking-wider mb-4">Producto</h4>
+            <ul class="space-y-2 text-sm">
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Para tu negocio</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Para consumidores</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Opita Saldo</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Algoritmo transparente</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">API pública</a></li>
+            </ul>
+          </div>
+
+          {/* Datos y privacidad */}
+          <div class="md:col-span-2">
+            <h4 class="text-xs font-bold text-ink-900 uppercase tracking-wider mb-4">Privacidad</h4>
+            <ul class="space-y-2 text-sm">
+              <li><a href="/legal/ptd" class="text-ink-600 hover:text-brand-700 transition-colors">Política de Tratamiento (PTD)</a></li>
+              <li><a href="/legal/aviso" class="text-ink-600 hover:text-brand-700 transition-colors">Aviso de Privacidad</a></li>
+              <li><a href="/admin/dpo" class="text-ink-600 hover:text-brand-700 transition-colors">Dashboard DPO</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Suprimir mi negocio</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Reporte de auditoría</a></li>
+            </ul>
+          </div>
+
+          {/* Compañía */}
+          <div class="md:col-span-2">
+            <h4 class="text-xs font-bold text-ink-900 uppercase tracking-wider mb-4">Compañía</h4>
+            <ul class="space-y-2 text-sm">
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Equipo</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Inversionistas</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Bitácora pública</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Roadmap</a></li>
+              <li><a href="#" class="text-ink-600 hover:text-brand-700 transition-colors">Contacto</a></li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div class="pt-8 border-t border-border flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-xs text-ink-500">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span>© {new Date().getFullYear()} Opita Code S.A.S.</span>
+            <span class="hidden md:inline">·</span>
+            <span>NIT 1007465784-0</span>
+            <span class="hidden md:inline">·</span>
+            <span>Neiva, Huila, Colombia</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-accent-500"></span>
+              Datos sintéticos · Investor demo v0.1
+            </span>
+            <span>·</span>
+            <a href="/admin/dpo" class="hover:text-brand-700">Ver staging E2E 18/18 ✓</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

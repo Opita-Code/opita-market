@@ -1,0 +1,41 @@
+---
+/**
+ * Section — semantic vertical-rhythm wrapper with optional surface tint.
+ *
+ * Usage:
+ *   <Section>{children}</Section>
+ *   <Section tone="muted">{children}</Section>
+ *   <Section tone="brand" size="lg">{children}</Section>
+ */
+interface Props {
+  tone?: "default" | "muted" | "brand" | "ink" | "warm";
+  size?: "sm" | "md" | "lg" | "xl" | "none";
+  id?: string;
+  class?: string;
+}
+
+const { tone = "default", size = "lg", id, class: className = "" } = Astro.props;
+
+const sizeMap: Record<NonNullable<Props["size"]>, string> = {
+  none: "",
+  sm: "py-10 sm:py-12",
+  md: "py-12 sm:py-16",
+  lg: "py-16 sm:py-20 lg:py-24",
+  xl: "py-20 sm:py-28 lg:py-32",
+};
+
+const toneMap: Record<NonNullable<Props["tone"]>, string> = {
+  default: "bg-background",
+  muted: "bg-surface",
+  brand:
+    "bg-gradient-to-br from-brand-50 via-brand-50/50 to-background border-y border-brand-100",
+  ink: "bg-ink-900 text-ink-50",
+  warm: "bg-gradient-to-br from-brand-50 to-accent-50 border-y border-brand-100",
+};
+
+const Tag = "section";
+---
+
+<Tag id={id} class:list={["relative", sizeMap[size], toneMap[tone], className]}>
+  <slot />
+</Tag>

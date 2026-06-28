@@ -1,0 +1,82 @@
+---
+/**
+ * StatCounter — animated number counter (CSS-only via @property).
+ * Pair with StatGrid for trust strip / hero stats.
+ *
+ * Usage:
+ *   <StatCounter value="820" suffix="+" label="Negocios verificados" />
+ */
+interface Props {
+  value: string;
+  label?: string;
+  suffix?: string;
+  prefix?: string;
+  size?: "sm" | "md" | "lg" | "xl";
+  tone?: "default" | "brand" | "accent" | "sky" | "light";
+  class?: string;
+}
+
+const { value, label, suffix = "", prefix = "", size = "md", tone = "default", class: className = "" } = Astro.props;
+
+const sizeMap: Record<NonNullable<Props["size"]>, string> = {
+  sm: "text-2xl sm:text-3xl",
+  md: "text-3xl sm:text-4xl",
+  lg: "text-4xl sm:text-5xl lg:text-6xl",
+  xl: "text-5xl sm:text-6xl lg:text-7xl",
+};
+
+const toneMap: Record<NonNullable<Props["tone"]>, string> = {
+  default: "text-ink-900",
+  brand: "text-gradient",
+  accent: "text-accent-700",
+  sky: "text-sky-700",
+  light: "text-ink-50",
+};
+---
+
+<div class:list={["inline-flex flex-col", className]}>
+  <span class:list={["font-black tabular-nums tracking-tight leading-none", sizeMap[size], toneMap[tone]]}>
+    {prefix}<span class="counter" data-value={value}>{value}</span>{suffix}
+  </span>
+  {label && (
+    <span class:list={["mt-2 text-sm text-ink-600 font-medium", tone === "light" && "text-ink-300"]}>
+      {label}
+    </span>
+  )}
+</div>
+
+<script>
+  // Animate counters when they enter viewport
+  const counters = document.querySelectorAll<HTMLElement>(".counter");
+  const animateCounter = (el: HTMLElement) => {
+    const target = el.dataset.value ?? "0";
+    const numericTarget = parseInt(target.replace(/[^0-9.]/g, ""), 10);
+    if (Number.isNaN(numericTarget)) return;
+    const suffix = target.replace(/[0-9.,]/g, "");
+    const duration = 1800;
+    const start = performance.now();
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3); // ease-out cubic
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      const value = Math.floor(ease(t) * numericTarget);
+      el.textContent = value.toLocaleString("es-CO") + suffix;
+      if (t < 1) requestAnimationFrame(tick);
+      else el.textContent = target;
+    };
+    requestAnimationFrame(tick);
+  };
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          animateCounter(entry.target as HTMLElement);
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.4 },
+  );
+
+  counters.forEach((c) => observer.observe(c));
+</script>

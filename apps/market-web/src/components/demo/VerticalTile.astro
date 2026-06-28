@@ -1,0 +1,87 @@
+---
+/**
+ * VerticalTile — large card linking to a vertical landing page.
+ * Uses the AI-generated hero illustration when available; falls back to gradient.
+ *
+ * Usage:
+ *   <VerticalTile vertical={VERTICALES.foods} />
+ */
+import { type Vertical } from "../../lib/demo-data";
+
+interface Props {
+  vertical: Vertical;
+  size?: "md" | "lg";
+  class?: string;
+}
+
+const { vertical, size = "md", class: className = "" } = Astro.props;
+
+// Map accent color to CSS gradient class
+const accentGradient: Record<Vertical["colorAccent"], string> = {
+  brand: "from-brand-500 via-brand-400 to-accent-400",
+  accent: "from-accent-500 via-accent-400 to-brand-400",
+  sky: "from-sky-500 via-sky-400 to-brand-300",
+  warning: "from-[oklch(0.72_0.16_65)] via-[oklch(0.65_0.15_50)] to-brand-400",
+};
+
+const softBg: Record<Vertical["colorAccent"], string> = {
+  brand: "from-brand-50 to-accent-50 border-brand-200",
+  accent: "from-accent-50 to-brand-50 border-accent-200",
+  sky: "from-sky-50 to-brand-50 border-sky-200",
+  warning: "from-[oklch(0.97_0.025_65)] to-brand-50 border-[oklch(0.90_0.08_65)]",
+};
+
+const sizeCls = size === "lg" ? "" : "";
+const emojiSize = size === "lg" ? "text-7xl" : "text-5xl";
+const titleSize = size === "lg" ? "text-2xl" : "text-xl";
+const titlePad = size === "lg" ? "p-8" : "p-5";
+
+// Hero image for this vertical (served from public/demo/verticals/{slug}.png)
+const heroImage = `/demo/verticals/${vertical.slug}.png`;
+---
+
+<a
+  href={`/demo/${vertical.slug}`}
+  class:list={[
+    "group block rounded-2xl bg-gradient-to-br border hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden",
+    softBg[vertical.colorAccent],
+    className,
+  ]}
+>
+  {/* Hero image (16:9 aspect) */}
+  <div class="relative aspect-[16/9] overflow-hidden">
+    <img
+      src={heroImage}
+      alt={`${vertical.nombre} — ${vertical.subtitulo}`}
+      loading="lazy"
+      decoding="async"
+      class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+    />
+    <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+    <div class="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
+      <span class="text-3xl drop-shadow-md" aria-hidden="true">{vertical.emoji}</span>
+      <span class="text-xs text-white/90 font-medium backdrop-blur-sm bg-black/30 px-2 py-1 rounded">
+        {vertical.pruebaSocial}
+      </span>
+    </div>
+  </div>
+
+  {/* Body */}
+  <div class:list={[titlePad]}>
+    <h3 class:list={[titleSize, "font-bold text-ink-900 mb-1 tracking-tight"]}>
+      {vertical.nombre}
+    </h3>
+    <p class="text-sm font-medium text-brand-700 mb-3">{vertical.subtitulo}</p>
+    <p class="text-sm text-ink-600 leading-relaxed mb-4 line-clamp-2">
+      {vertical.descripcion}
+    </p>
+
+    <div class="flex items-center justify-between pt-3 border-t border-current/10">
+      <span class="inline-block w-12 h-1 rounded-full bg-gradient-to-r opacity-60 group-hover:opacity-100 transition-opacity" class:list={accentGradient[vertical.colorAccent]} aria-hidden="true"></span>
+      <span class="text-sm font-semibold text-brand-700 group-hover:text-brand-900 transition-colors inline-flex items-center gap-1">
+        Explorar
+        <span class="transition-transform group-hover:translate-x-0.5">→</span>
+      </span>
+    </div>
+  </div>
+</a>

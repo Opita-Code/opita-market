@@ -1,0 +1,46 @@
+---
+/**
+ * RatingStars — visual rating display (0-5, with one decimal).
+ *
+ * Usage:
+ *   <RatingStars rating={4.7} count={234} />
+ */
+interface Props {
+  rating: number;
+  count?: number;
+  size?: "sm" | "md" | "lg";
+  class?: string;
+}
+
+const { rating, count, size = "sm", class: className = "" } = Astro.props;
+
+const sizeMap = {
+  sm: { star: "text-xs", text: "text-xs" },
+  md: { star: "text-sm", text: "text-sm" },
+  lg: { star: "text-base", text: "text-base" },
+};
+const sz = sizeMap[size];
+
+const fullStars = Math.floor(rating);
+const hasHalf = rating - fullStars >= 0.5;
+const emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
+---
+
+<span
+  class:list={["inline-flex items-center gap-1", sz.text, className]}
+  aria-label={`${rating} de 5 estrellas${count ? `, ${count} reseñas` : ""}`}
+>
+  <span class="flex" aria-hidden="true">
+    {Array.from({ length: fullStars }).map(() => (
+      <span class:list={[sz.star, "text-warning"]}>★</span>
+    ))}
+    {hasHalf && <span class:list={[sz.star, "text-warning"]}>★</span>}
+    {Array.from({ length: emptyStars }).map(() => (
+      <span class:list={[sz.star, "text-ink-300"]}>★</span>
+    ))}
+  </span>
+  <span class="font-semibold text-ink-900">{rating.toFixed(1)}</span>
+  {count !== undefined && (
+    <span class="text-ink-500">({count.toLocaleString("es-CO")})</span>
+  )}
+</span>

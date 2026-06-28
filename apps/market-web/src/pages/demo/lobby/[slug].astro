@@ -1,0 +1,199 @@
+---
+/**
+ * Business profile / Lobby page
+ * /demo/lobby/[slug]
+ */
+import DemoLayout from "../../../layouts/DemoLayout.astro";
+import Container from "../../../components/demo/Container.astro";
+import Section from "../../../components/demo/Section.astro";
+import Badge from "../../../components/demo/Badge.astro";
+import Button from "../../../components/demo/Button.astro";
+import Card from "../../../components/demo/Card.astro";
+import RatingStars from "../../../components/demo/RatingStars.astro";
+import { NEGOCIOS, formatCOP, tierLabel, tierDescripcion, type DemoNegocio, VERTICALES } from "../../../lib/demo-data";
+
+export function getStaticPaths() {
+  return NEGOCIOS.map((n) => ({
+    params: { slug: n.slug },
+    props: { negocio: n },
+  }));
+}
+
+interface Props {
+  negocio?: DemoNegocio;
+}
+
+// Support both build-time (getStaticPaths props) and dev (params lookup)
+const negocio =
+  (Astro.props as Props).negocio ?? NEGOCIOS.find((n) => n.slug === Astro.params.slug);
+
+if (!negocio) {
+  return Astro.redirect("/demo");
+}
+
+const vertical = VERTICALES[negocio.vertical];
+
+const whatsappLink =
+  "https://wa.me/" +
+  negocio.whatsapp_e164 +
+  "?text=" +
+  encodeURIComponent(
+    "Hola, vi tu perfil en Opita Market. Quiero más información sobre " + negocio.nombre + ".",
+  );
+
+const gradientByVertical: Record<DemoNegocio["vertical"], string> = {
+  foods: "from-brand-200 via-brand-100 to-accent-100",
+  barber: "from-sky-200 via-sky-100 to-ink-100",
+  beauty: "from-accent-200 via-accent-100 to-brand-100",
+  hogar: "from-[oklch(0.92_0.06_65)] via-[oklch(0.95_0.04_65)] to-brand-100",
+};
+
+const isPartner = negocio.tier !== "reclamado";
+const pageTitle = negocio.nombre + " | " + vertical.nombre;
+---
+
+<DemoLayout title={pageTitle} description={negocio.descripcion} hideBanner={true}>
+  <Section tone="muted" size="sm" class="!py-4">
+    <Container>
+      <nav class="text-sm text-ink-600 flex items-center gap-2 flex-wrap">
+        <a href="/demo" class="hover:text-brand-700">Opita Market</a>
+        <span>/</span>
+        <a href={"/demo/" + vertical.slug} class="hover:text-brand-700">{vertical.nombre}</a>
+        <span>/</span>
+        <span class="text-ink-900 font-medium truncate">{negocio.nombre}</span>
+      </nav>
+    </Container>
+  </Section>
+
+  <Section tone="default" size="md">
+    <Container>
+      <div class="grid lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2">
+          <div class:list={["relative aspect-[21/9] rounded-2xl bg-gradient-to-br overflow-hidden mb-6", gradientByVertical[negocio.vertical]]}>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-9xl opacity-20">{vertical.emoji}</span>
+            </div>
+            <div class="absolute top-4 left-4 flex flex-wrap gap-2">
+              {negocio.tier === "premium" && <Badge variant="brand" size="md">⭐ Premium</Badge>}
+              {negocio.tier === "visible" && <Badge variant="success" size="md">✓ Verificado</Badge>}
+              {negocio.tier === "reclamado" && <Badge variant="outline" size="md">Reclamado</Badge>}
+              {negocio.acepta_saldo && <Badge variant="accent" size="md">💰 Acepta Saldo</Badge>}
+            </div>
+          </div>
+
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h1 class="text-3xl sm:text-4xl font-black text-ink-900 tracking-tight leading-tight mb-2">{negocio.nombre}</h1>
+              <p class="text-lg text-ink-600">{negocio.tagline}</p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-4 text-sm mb-6">
+            <div class="flex items-center gap-1.5 text-ink-700">
+              <span aria-hidden="true">📍</span>
+              <span>{negocio.barrio}, {negocio.ciudad}, {negocio.departamento}</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-ink-700">
+              <span aria-hidden="true">🕐</span>
+              <span>{negocio.horario}</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <RatingStars rating={negocio.rating} count={negocio.reviews_count} size="lg" />
+          </div>
+        </div>
+
+        <div>
+          <Card padding="lg" class="sticky top-24">
+            {!isPartner ? (
+              <>
+                <Badge variant="warning" size="sm">⚠️ Perfil no reclamado</Badge>
+                <h3 class="text-lg font-bold text-ink-900 mt-3 mb-2">¿Sos el dueño de este negocio?</h3>
+                <p class="text-sm text-ink-600 mb-4 leading-relaxed">
+                  Este perfil muestra información pública. Reclamalo gratis para editar, publicar tu menú o servicios, y responder reseñas.
+                </p>
+                <Button variant="primary" class="w-full">Reclamar este negocio gratis</Button>
+                <p class="text-xs text-ink-500 mt-3 text-center">Verificación NIT + DV · 24 horas</p>
+              </>
+            ) : (
+              <>
+                <h3 class="text-lg font-bold text-ink-900 mb-1">¿Cómo contactarlos?</h3>
+                <p class="text-sm text-ink-600 mb-4">Elegí el canal que prefieras. Te respondemos de inmediato.</p>
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer" class="block w-full mb-3 px-4 py-3 rounded-xl bg-accent-600 text-white font-semibold text-center hover:bg-accent-700 transition-colors">💬 Abrir WhatsApp</a>
+                {negocio.acepta_saldo && <Button variant="primary" class="w-full mb-3">💰 Pagar con Opita Saldo</Button>}
+                <Button variant="outline" class="w-full mb-4">📞 Llamar</Button>
+                <div class="pt-4 border-t border-border text-xs text-ink-500 space-y-1">
+                  <p><strong class="text-ink-700">Actualizado:</strong> {negocio.precio_actualizado}</p>
+                  <p><strong class="text-ink-700">{tierLabel(negocio.tier)}</strong> — {tierDescripcion(negocio.tier)}</p>
+                </div>
+              </>
+            )}
+          </Card>
+        </div>
+      </div>
+    </Container>
+  </Section>
+
+  <Section tone="muted" size="md">
+    <Container>
+      <div class="max-w-3xl">
+        <h2 class="text-2xl font-bold text-ink-900 mb-3">Acerca de</h2>
+        <p class="text-ink-700 leading-relaxed mb-4">{negocio.descripcion}</p>
+        <div class="flex flex-wrap gap-2">
+          {negocio.categorias_tags.map((tag) => <Badge variant="outline">{tag}</Badge>)}
+        </div>
+      </div>
+    </Container>
+  </Section>
+
+  {isPartner && negocio.productos_destacados.length > 0 && (
+    <Section tone="default" size="lg">
+      <Container>
+        <h2 class="text-2xl font-bold text-ink-900 mb-6">
+          {negocio.vertical === "foods" ? "Productos destacados" : "Servicios y precios"}
+        </h2>
+        <Card padding="none" class="overflow-hidden">
+          <ul class="divide-y divide-border">
+            {negocio.productos_destacados.map((p) => (
+              <li class="px-6 py-4 flex items-center justify-between hover:bg-surface transition-colors">
+                <div>
+                  <div class="font-semibold text-ink-900">{p.nombre}</div>
+                  <div class="text-xs text-ink-500 mt-0.5">{p.categoria} · por {p.unidad}</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-lg font-bold text-brand-700 tabular-nums">
+                    {p.precio_cop === 0 ? <span class="text-accent-700">Gratis</span> : formatCOP(p.precio_cop)}
+                  </div>
+                  {negocio.acepta_saldo && p.precio_cop > 0 && <div class="text-xs text-accent-700">Acepta Opita Saldo</div>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </Container>
+    </Section>
+  )}
+
+  <Section tone="default" size="md" class="border-t border-border">
+    <Container>
+      <div class="grid sm:grid-cols-3 gap-6 text-center">
+        <div>
+          <div class="text-2xl mb-2">🔒</div>
+          <h4 class="text-sm font-bold text-ink-900 mb-1">Datos protegidos</h4>
+          <p class="text-xs text-ink-600">Ley 1581/2012 · Habeas Data · DPO en 15 días</p>
+        </div>
+        <div>
+          <div class="text-2xl mb-2">✓</div>
+          <h4 class="text-sm font-bold text-ink-900 mb-1">Negocio verificado</h4>
+          <p class="text-xs text-ink-600">NIT validado contra RUES</p>
+        </div>
+        <div>
+          <div class="text-2xl mb-2">💰</div>
+          <h4 class="text-sm font-bold text-ink-900 mb-1">Paga como quieras</h4>
+          <p class="text-xs text-ink-600">Opita Saldo · Bre-B · Nequi · Daviplata</p>
+        </div>
+      </div>
+    </Container>
+  </Section>
+</DemoLayout>

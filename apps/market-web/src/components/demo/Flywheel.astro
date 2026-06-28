@@ -1,0 +1,210 @@
+---
+/**
+ * Flywheel — visual B2C × B2B connection diagram.
+ *
+ * Two columns (B2C left, B2B right) with Opita Market in the center as the
+ * engine. Each side shows 5 steps, with arrows/data flowing through the center.
+ *
+ * Usage:
+ *   <Flywheel />
+ */
+import Badge from "./Badge.astro";
+
+const b2cSteps = [
+  {
+    icon: "🔍",
+    title: "Buscas",
+    description: "Escribes 'arepas cerca' o navegas por categoría. El algoritmo rankea por geo + verificado + frescura + reputación.",
+    artifact: "Query: 'arepas' → 12 resultados en Neiva, 8 verificados",
+  },
+  {
+    icon: "👀",
+    title: "Comparas",
+    description: "Ves precios reales con fecha de actualización. No 'llámanos para verificar'. Lo que ves es lo que pagas.",
+    artifact: "Lechona: $38.000 · actualizado hace 2 horas",
+  },
+  {
+    icon: "📱",
+    title: "Contactas",
+    description: "Toca 'WhatsApp' → mensaje pre-llenado con tu pedido. Sin formularios, sin registro.",
+    artifact: "wa.me/573001234567?text=Hola, vi tu perfil en Opita Market...",
+  },
+  {
+    icon: "💰",
+    title: "Pagas con Saldo",
+    description: "Cero tarjeta. Cero datéfono. Tu Opita Saldo viaja instantáneo del consumidor al negocio.",
+    artifact: "$38.000 → Opita Saldo → wallet del restaurante (al instante)",
+  },
+  {
+    icon: "⭐",
+    title: "Dejas reseña",
+    description: "Solo después de una compra verificada. Tu reseña suma a la reputación del negocio.",
+    artifact: "5★ + comentario → +12 puntos de reputación → sube el ranking",
+  },
+];
+
+const b2bSteps = [
+  {
+    icon: "📝",
+    title: "Reclamas tu perfil",
+    description: "Buscas tu razón social. La encuentras en RUES. Un clic para reclamar.",
+    artifact: "NIT 900.123.456-7 → perfil creado → verificación en 24h",
+  },
+  {
+    icon: "📋",
+    title: "Publicas tu catálogo",
+    description: "Subes menú, servicios, precios. Sin límite. Sin costo. Gratis hasta 5.000 productos.",
+    artifact: "12 platos + 4 categorías + 3 precios mayoristas",
+  },
+  {
+    icon: "📩",
+    title: "Recibes clientes",
+    description: "WhatsApp suena. El cliente te llegó por tu ranking, tu badge Verificado, o porque publicaste un precio que nadie más tenía.",
+    artifact: "Mensaje entrante: 'Hola, vi tu perfil en Opita Market...'",
+  },
+  {
+    icon: "💵",
+    title: "Cobras instantáneo",
+    description: "Opita Saldo llega a tu wallet en segundos. Sin esperas de transferencia, sin comisiones sorpresa.",
+    artifact: "+$38.000 a wallet → $73.300 disponible para retiro",
+  },
+  {
+    icon: "📊",
+    title: "Optimizas",
+    description: "Actualizas precios según demanda. Las reseñas suben. Tu ranking mejora. Más clientes. Más ingresos.",
+    artifact: "Actualizaste precio → +5 posiciones → 30% más consultas",
+  },
+];
+---
+
+<section class="relative bg-gradient-to-b from-background to-surface py-20 sm:py-28" data-reveal>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 max-w-3xl mx-auto">
+      <Badge variant="brand">Capítulo 05 · El flywheel</Badge>
+      <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+        Dos mundos. <span class="text-gradient">Una red que se refuerza.</span>
+      </h2>
+      <p class="text-lg sm:text-xl text-ink-600 leading-relaxed text-pretty">
+        Cada acción de un consumidor alimenta al negocio. Cada acción del negocio mejora la experiencia del consumidor. <strong>El círculo virtuoso del marketplace.</strong>
+      </p>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-6 lg:gap-10 relative">
+      {/* Center connector */}
+      <div class="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex-col items-center gap-3 pointer-events-none">
+        <div class="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 shadow-2xl shadow-brand-500/30 flex items-center justify-center">
+          <span class="text-2xl font-black text-white">∞</span>
+        </div>
+        <div class="text-xs font-bold text-brand-700 uppercase tracking-wider bg-background px-2 py-1 rounded-full border border-brand-200">
+          Opita Market
+        </div>
+        {/* Animated arrows */}
+        <div class="absolute -left-20 top-1/2 -translate-y-1/2 text-3xl text-brand-500 animate-pulse-soft">→</div>
+        <div class="absolute -right-20 top-1/2 -translate-y-1/2 text-3xl text-accent-500 animate-pulse-soft">←</div>
+      </div>
+
+      {/* B2C column */}
+      <div data-reveal>
+        <ol class="relative space-y-4">
+          {b2cSteps.map((step, i) => (
+            <li class="relative pl-14 animate-fade-up" style={`animation-delay: ${i * 100}ms`}>
+              <div class="absolute left-0 top-0 w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center font-black text-sm text-white shadow-lg shadow-brand-500/20">
+                {i + 1}
+              </div>
+              <div class="bg-surface-elevated rounded-2xl p-5 border border-border shadow-sm hover:border-brand-300 hover:shadow-md transition-all">
+                <div class="flex items-baseline gap-3 mb-1.5">
+                  <span class="text-2xl" aria-hidden="true">{step.icon}</span>
+                  <h4 class="font-bold text-lg text-ink-900">{step.title}</h4>
+                </div>
+                <p class="text-sm text-ink-600 leading-relaxed">{step.description}</p>
+                <div class="mt-3 px-3 py-2 rounded-lg bg-brand-50 border border-brand-200 text-xs font-mono text-ink-600">
+                  <span class="text-brand-500">→</span> {step.artifact}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {/* B2B column */}
+      <div data-reveal>
+        <ol class="relative space-y-4">
+          {b2bSteps.map((step, i) => (
+            <li class="relative pl-14 animate-fade-up" style={`animation-delay: ${i * 100 + 50}ms`}>
+              <div class="absolute left-0 top-0 w-10 h-10 rounded-full bg-gradient-to-br from-accent-500 to-accent-700 flex items-center justify-center font-black text-sm text-white shadow-lg shadow-accent-500/20">
+                {i + 1}
+              </div>
+              <div class="bg-surface-elevated rounded-2xl p-5 border border-border shadow-sm hover:border-accent-300 hover:shadow-md transition-all">
+                <div class="flex items-baseline gap-3 mb-1.5">
+                  <span class="text-2xl" aria-hidden="true">{step.icon}</span>
+                  <h4 class="font-bold text-lg text-ink-900">{step.title}</h4>
+                </div>
+                <p class="text-sm text-ink-600 leading-relaxed">{step.description}</p>
+                <div class="mt-3 px-3 py-2 rounded-lg bg-accent-50 border border-accent-200 text-xs font-mono text-ink-600">
+                  <span class="text-accent-500">→</span> {step.artifact}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+
+    {/* The flywheel diagram */}
+    <div class="mt-20 max-w-4xl mx-auto" data-reveal>
+      <div class="rounded-3xl bg-gradient-to-br from-ink-950 to-ink-900 text-ink-50 p-8 sm:p-10 lg:p-12 shadow-2xl relative overflow-hidden">
+        <div class="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-brand-600/10 blur-3xl"></div>
+        <div class="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-accent-500/10 blur-3xl"></div>
+
+        <div class="relative text-center">
+          <Badge variant="brand">El efecto red</Badge>
+          <h3 class="text-3xl sm:text-4xl font-black mt-4 mb-3 text-balance">
+            Cada nuevo consumidor atrae más negocios. Cada nuevo negocio atrae más consumidores.
+          </h3>
+          <p class="text-ink-300 leading-relaxed max-w-2xl mx-auto mb-10">
+            Esto es lo que hace un marketplace exitoso: el círculo virtuoso se refuerza solo. Y por eso Opita Market empieza por regiones con densidad — Huila, eje cafetero, después Bogotá — en lugar de intentar toda Colombia desde día 1.
+          </p>
+
+          {/* Visual flywheel */}
+          <div class="relative max-w-md mx-auto aspect-square">
+            {/* Outer ring */}
+            <div class="absolute inset-0 rounded-full border-2 border-dashed border-ink-700"></div>
+            <div class="absolute inset-6 rounded-full border-2 border-dashed border-ink-700/60"></div>
+            <div class="absolute inset-12 rounded-full border-2 border-dashed border-ink-700/40"></div>
+
+            {/* Center */}
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="text-center">
+                <div class="text-4xl font-black text-gradient-warm">Opita</div>
+                <div class="text-4xl font-black text-gradient-cool">Market</div>
+                <div class="text-xs text-ink-400 mt-2 uppercase tracking-wider">Network effect</div>
+              </div>
+            </div>
+
+            {/* Nodes around the wheel */}
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-brand-600 flex items-center justify-center text-2xl shadow-lg shadow-brand-500/30 animate-float-slow">🛒</div>
+            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-16 h-16 rounded-full bg-accent-600 flex items-center justify-center text-2xl shadow-lg shadow-accent-500/30 animate-float-slower">🏪</div>
+            <div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-sky-600 flex items-center justify-center text-2xl shadow-lg shadow-sky-500/30 animate-float-slow delay-200">📊</div>
+            <div class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-16 h-16 rounded-full bg-warning flex items-center justify-center text-2xl shadow-lg shadow-warning/30 animate-float-slower delay-300">💰</div>
+          </div>
+
+          {/* Stats below */}
+          <div class="grid grid-cols-3 gap-6 mt-10 max-w-2xl mx-auto">
+            <div>
+              <div class="text-3xl font-black text-gradient-warm">+12%</div>
+              <div class="text-xs text-ink-300 mt-1">Clientes por reseña</div>
+            </div>
+            <div>
+              <div class="text-3xl font-black text-gradient-cool">3.4x</div>
+              <div class="text-xs text-ink-300 mt-1">Visibilidad por Verificado</div>
+            </div>
+            <div>
+              <div class="text-3xl font-black text-gradient-warm">48h</div>
+              <div class="text-xs text-ink-300 mt-1">Tiempo a primer pago</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

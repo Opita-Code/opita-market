@@ -1,0 +1,59 @@
+---
+/**
+ * Card — semantic container for content blocks.
+ *
+ * Usage:
+ *   <Card>{children}</Card>
+ *   <Card interactive>{children}</Card>
+ *   <Card tone="muted" padding="lg">{children}</Card>
+ */
+interface Props {
+  tone?: "default" | "muted" | "brand" | "accent" | "outline";
+  padding?: "sm" | "md" | "lg" | "none";
+  interactive?: boolean;
+  href?: string;
+  class?: string;
+}
+
+const {
+  tone = "default",
+  padding = "md",
+  interactive = false,
+  href,
+  class: className = "",
+} = Astro.props;
+
+const paddingMap: Record<NonNullable<Props["padding"]>, string> = {
+  none: "",
+  sm: "p-4",
+  md: "p-6",
+  lg: "p-8",
+};
+
+const toneMap: Record<NonNullable<Props["tone"]>, string> = {
+  default: "bg-surface-elevated border border-border",
+  muted: "bg-surface border border-border",
+  brand: "bg-brand-50 border border-brand-200",
+  accent: "bg-accent-50 border border-accent-200",
+  outline: "bg-transparent border-2 border-border",
+};
+
+const interactiveCls = interactive
+  ? "transition-shadow duration-200 hover:shadow-md cursor-pointer"
+  : "";
+
+const Tag = href ? "a" : "div";
+---
+
+<Tag
+  href={href}
+  class:list={[
+    "block rounded-xl",
+    paddingMap[padding],
+    toneMap[tone],
+    interactiveCls,
+    className,
+  ]}
+>
+  <slot />
+</Tag>

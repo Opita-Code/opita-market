@@ -1,0 +1,226 @@
+---
+/**
+ * FeedCard — TikTok-style product video card for the social commerce feed.
+ *
+ * Mimics TikTok Shop: vertical video aspect, autoplay indicator, play button,
+ * product overlay (name, price, business), creator info, action buttons.
+ *
+ * Usage:
+ *   <FeedCard
+ *     videoSrc="/demo/feed/asadero-lechona.png"
+ *     creatorName="@la_lechona_de_opita"
+ *     creatorAvatar="/demo/avatars/maria.png"
+ *     productName="Lechona por libra"
+ *     productPrice={38000}
+ *     businessName="Asadero El Tamayo"
+ *     businessTier="premium"
+ *     duration={23}
+ *     likes={1247}
+ *     comments={89}
+ *     saves={156}
+ *     verified
+ *     acceptsSaldo
+ *     algorithmReason="Porque te gustan los asados en Neiva"
+ *   />
+ */
+
+interface Props {
+  videoSrc: string;
+  creatorName: string;
+  creatorAvatar?: string;
+  creatorFollowers?: number;
+  productName: string;
+  productPrice: number;
+  productUnit?: string;
+  businessName: string;
+  businessTier?: "premium" | "visible" | "reclamado";
+  businessVerified?: boolean;
+  acceptsSaldo?: boolean;
+  duration?: number;
+  likes?: number;
+  comments?: number;
+  saves?: number;
+  algorithmReason: string;
+  size?: "sm" | "md";
+  class?: string;
+}
+
+const {
+  videoSrc,
+  creatorName,
+  creatorAvatar,
+  creatorFollowers,
+  productName,
+  productPrice,
+  productUnit,
+  businessName,
+  businessTier = "visible",
+  businessVerified = false,
+  acceptsSaldo = false,
+  duration = 23,
+  likes = 1247,
+  comments = 89,
+  saves = 156,
+  algorithmReason,
+  size = "md",
+  class: className = "",
+} = Astro.props;
+
+// Format price Colombian style
+const formatCOP = (v: number) =>
+  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
+    .format(v)
+    .replace(/\u00A0/g, " ");
+
+const formatCount = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString("es-CO");
+};
+
+const sizeClass = size === "sm" ? "w-44" : "w-56 sm:w-64";
+const badgeSize = size === "sm" ? "text-[0.625rem]" : "text-xs";
+
+const initial = creatorName.replace("@", "").trim()[0]?.toUpperCase() ?? "?";
+
+const isLive = duration <= 0;
+---
+
+<div class:list={["relative group", sizeClass, className]} data-reveal>
+  {/* Video container (vertical 9:16 aspect) */}
+  <div class="relative aspect-[9/16] rounded-2xl overflow-hidden bg-ink-900 shadow-xl ring-1 ring-ink-900/10">
+    {/* Cover image */}
+    <img
+      src={videoSrc}
+      alt={productName}
+      loading="lazy"
+      decoding="async"
+      class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+    />
+
+    {/* Top gradient (for play button + duration) */}
+    <div class="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none"></div>
+
+    {/* Bottom gradient (for product card + creator info) */}
+    <div class="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black via-black/70 to-transparent pointer-events-none"></div>
+
+    {/* Top controls */}
+    <div class="absolute top-3 inset-x-3 flex items-center justify-between z-10">
+      {/* Live / autoplay indicator */}
+      <div class="flex items-center gap-1.5">
+        {isLive ? (
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-danger text-white text-[0.625rem] font-bold uppercase tracking-wider animate-pulse-soft">
+            <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+            Live
+          </span>
+        ) : (
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/40 backdrop-blur-sm text-white text-[0.625rem] font-semibold">
+            <span aria-hidden="true">▶</span>
+            AUTO
+          </span>
+        )}
+      </div>
+      {/* Duration */}
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-black/50 backdrop-blur-sm text-white text-[0.625rem] font-semibold tabular-nums">
+        0:{String(duration).padStart(2, "0")}
+      </span>
+    </div>
+
+    {/* Play button overlay (center) */}
+    <div class="absolute inset-0 flex items-center justify-center z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div class="w-16 h-16 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center">
+        <svg class="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+      </div>
+    </div>
+
+    {/* Right action rail */}
+    <div class="absolute right-2 bottom-24 z-10 flex flex-col items-center gap-3">
+      {/* Creator avatar */}
+      <div class="relative">
+        {creatorAvatar ? (
+          <img src={creatorAvatar} alt={creatorName} class="w-10 h-10 rounded-full ring-2 ring-white object-cover" />
+        ) : (
+          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-accent-500 ring-2 ring-white flex items-center justify-center font-black text-sm text-white">
+            {initial}
+          </div>
+        )}
+        <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-accent-500 text-white flex items-center justify-center text-xs font-bold">+</div>
+      </div>
+
+      {/* Like */}
+      <div class="flex flex-col items-center">
+        <button class="w-9 h-9 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-danger/80 transition-colors" aria-label="Me gusta">
+          <span class="text-base">❤</span>
+        </button>
+        <span class="text-white text-[0.625rem] font-bold mt-0.5">{formatCount(likes)}</span>
+      </div>
+
+      {/* Comment */}
+      <div class="flex flex-col items-center">
+        <button class="w-9 h-9 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-sky-500/80 transition-colors" aria-label="Comentar">
+          <span class="text-base">💬</span>
+        </button>
+        <span class="text-white text-[0.625rem] font-bold mt-0.5">{formatCount(comments)}</span>
+      </div>
+
+      {/* Save */}
+      <div class="flex flex-col items-center">
+        <button class="w-9 h-9 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-warning/80 transition-colors" aria-label="Guardar">
+          <span class="text-base">🔖</span>
+        </button>
+        <span class="text-white text-[0.625rem] font-bold mt-0.5">{formatCount(saves)}</span>
+      </div>
+
+      {/* Share */}
+      <div class="flex flex-col items-center">
+        <button class="w-9 h-9 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white hover:bg-accent-500/80 transition-colors" aria-label="Compartir">
+          <span class="text-base">↗</span>
+        </button>
+      </div>
+    </div>
+
+    {/* Bottom info: algorithm reason + product card + creator */}
+    <div class="absolute inset-x-2 bottom-2 z-10 space-y-2">
+      {/* Algorithm reason (the "why am I seeing this" transparency) */}
+      <div class="px-2 py-1 rounded-full bg-black/40 backdrop-blur-sm inline-flex items-center gap-1.5">
+        <span class="text-[0.625rem]" aria-hidden="true">🧠</span>
+        <span class="text-white text-[0.625rem] font-medium">{algorithmReason}</span>
+      </div>
+
+      {/* Creator info */}
+      <div class="flex items-center gap-1.5 text-white">
+        <span class:list={["font-bold truncate", badgeSize]}>{creatorName}</span>
+        {creatorFollowers && (
+          <span class:list={["opacity-70", badgeSize]}>{formatCount(creatorFollowers)} seg.</span>
+        )}
+      </div>
+
+      {/* Product card overlay */}
+      <a href="#" class="block rounded-xl bg-white/95 backdrop-blur-sm p-2.5 hover:bg-white transition-colors">
+        <div class="flex items-center gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1.5">
+              <span class:list={["font-bold text-ink-900 truncate", badgeSize]}>{productName}</span>
+              {businessVerified && (
+                <span class="text-[0.625rem] text-accent-700 font-bold" aria-label="Verificado">✓</span>
+              )}
+            </div>
+            <div class="flex items-baseline gap-1 mt-0.5">
+              <span class:list={["font-black text-brand-700", badgeSize]}>{formatCOP(productPrice)}</span>
+              {productUnit && <span class:list={["text-ink-500", badgeSize]}>/ {productUnit}</span>}
+            </div>
+            <div class="flex items-center gap-1 mt-0.5">
+              <span class:list={["text-ink-500 truncate", badgeSize]}>{businessName}</span>
+              {businessTier === "premium" && <span class="text-[0.5rem]">⭐</span>}
+            </div>
+          </div>
+          <button class="flex-shrink-0 px-3 py-1.5 rounded-lg bg-brand-600 text-white font-bold text-xs hover:bg-brand-700 transition-colors">
+            {acceptsSaldo ? "💰 Saldo" : "Pedir"}
+          </button>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>

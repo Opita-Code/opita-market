@@ -1,0 +1,104 @@
+---
+/**
+ * AlgorithmTrace — visual step-by-step of how a recommendation is scored.
+ *
+ * Usage:
+ *   <AlgorithmTrace trace={TRACES[0]} />
+ */
+import type { AlgoTrace, Factor } from "../../lib/demo-algorithm";
+import { FACTOR_DESCRIPCIONES } from "../../lib/demo-algorithm";
+import Badge from "./Badge.astro";
+
+interface Props {
+  trace: AlgoTrace;
+}
+
+const { trace } = Astro.props;
+
+const factorIcons: Record<Factor, string> = {
+  geo: "📍",
+  verificado: "✓",
+  acepta_saldo: "💰",
+  recencia: "🕐",
+  reputacion: "⭐",
+};
+---
+
+<article class="rounded-2xl border border-border bg-surface-elevated overflow-hidden">
+  {/* Header */}
+  <header class="px-6 py-5 border-b border-border bg-gradient-to-br from-brand-50 to-accent-50">
+    <h3 class="text-lg font-bold text-ink-900 leading-snug">{trace.titulo}</h3>
+    <div class="mt-3 flex flex-wrap gap-2 text-xs">
+      <Badge variant="sky">📍 {trace.contexto_usuario.ubicacion}</Badge>
+      <Badge variant="brand">🎯 {trace.contexto_usuario.intencion}</Badge>
+      <Badge variant="outline">{trace.candidatos_evaluados} candidatos evaluados</Badge>
+    </div>
+    {trace.contexto_usuario.notas && (
+      <p class="mt-3 text-sm text-ink-700 italic leading-relaxed">
+        "{trace.contexto_usuario.notas}"
+      </p>
+    )}
+  </header>
+
+  {/* Ranking */}
+  <div class="divide-y divide-border">
+    {trace.ranking.map((item, i) => (
+      <div class="px-6 py-5">
+        <div class="flex items-start justify-between gap-4 mb-3">
+          <div class="flex items-start gap-3 min-w-0">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-brand-100 text-brand-800 font-bold text-sm flex items-center justify-center">
+              {i + 1}
+            </div>
+            <div class="min-w-0">
+              <h4 class="font-semibold text-ink-900 truncate">{item.negocio.nombre}</h4>
+              <p class="text-sm text-ink-600">{item.negocio.tagline}</p>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="text-2xl font-bold text-brand-700 tabular-nums">{item.score_total}</div>
+            <div class="text-xs text-ink-500">/ 100</div>
+          </div>
+        </div>
+
+        {/* Score breakdown */}
+        <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 mt-4">
+          {item.factores.map((f) => (
+            <div class="rounded-lg bg-surface p-2 border border-border">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="font-medium text-ink-700 inline-flex items-center gap-1">
+                  <span aria-hidden="true">{factorIcons[f.factor]}</span>
+                  <span class="hidden md:inline">{FACTOR_DESCRIPCIONES[f.factor].nombre.split(" ")[0]}</span>
+                </span>
+                <span class="text-ink-500">{f.peso_pct}%</span>
+              </div>
+              <div class="h-1.5 bg-ink-100 rounded-full overflow-hidden mb-1">
+                <div
+                  class="h-full bg-gradient-to-r from-brand-500 to-accent-500 rounded-full transition-all duration-500"
+                  style={`width: ${f.score}%`}
+                ></div>
+              </div>
+              <div class="text-xs text-ink-600 leading-tight" title={f.explicacion}>
+                <span class="font-semibold text-ink-900">{f.contribucion}</span>
+                <span class="text-ink-500"> / {f.peso_pct}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Badges */}
+        {item.badges.length > 0 && (
+          <div class="flex flex-wrap gap-1.5 mt-3">
+            {item.badges.map((b) => (
+              <Badge variant="default" size="xs">{b}</Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Plain-language reason */}
+        <p class="mt-3 text-xs text-ink-500 leading-relaxed">
+          {item.razon_recomendacion}
+        </p>
+      </div>
+    ))}
+  </div>
+</article>

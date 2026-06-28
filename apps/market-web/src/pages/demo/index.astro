@@ -1,0 +1,635 @@
+---
+/**
+ * Investor Demo — Home Page (v3: TikTok-Temu pivot)
+ * /demo
+ *
+ * Narrative architecture (15 chapters):
+ *   ACT 1: Hero (gradient mesh + floating cards)
+ *   ACT 2: Trusted by marquee
+ *   ACT 3: El problema (dark, somber)
+ *   ACT 4: Cómo funciona 3 pasos
+ *   ACT 5: El Feed (TikTok-style video feed) ← NEW
+ *   ACT 6: Vertical showcase (bento grid)
+ *   ACT 7: Price board LIVE
+ *   ACT 8: El algoritmo (deep dive with worked examples) ← UPGRADED
+ *   ACT 9: Creadores (creator economy) ← NEW
+ *   ACT 10: El flywheel (B2C × B2B connection) ← NEW
+ *   ACT 11: Para negocios vs Para personas
+ *   ACT 12: Comparison table (vs Temu + TikTok + MercadoLibre + Páginas Amarillas) ← UPGRADED
+ *   ACT 13: Testimonials
+ *   ACT 14: Roadmap
+ *   ACT 15: Compliance
+ *   ACT 16: Final CTA (investor focused)
+ */
+import DemoLayout from "../../layouts/DemoLayout.astro";
+import Container from "../../components/demo/Container.astro";
+import Badge from "../../components/demo/Badge.astro";
+import Button from "../../components/demo/Button.astro";
+import Card from "../../components/demo/Card.astro";
+import BgPattern from "../../components/demo/BgPattern.astro";
+import StatCounter from "../../components/demo/StatCounter.astro";
+import Timeline from "../../components/demo/Timeline.astro";
+import ComparisonTable from "../../components/demo/ComparisonTable.astro";
+import Testimonial from "../../components/demo/Testimonial.astro";
+import FloatingCards from "../../components/demo/FloatingCards.astro";
+import BentoGrid from "../../components/demo/BentoGrid.astro";
+import BentoCard from "../../components/demo/BentoCard.astro";
+import ChapterMarker from "../../components/demo/ChapterMarker.astro";
+import FeedShowcase from "../../components/demo/FeedShowcase.astro";
+import AlgorithmDeepDive from "../../components/demo/AlgorithmDeepDive.astro";
+import CreatorEconomy from "../../components/demo/CreatorEconomy.astro";
+import Flywheel from "../../components/demo/Flywheel.astro";
+import { VERTICALES, PRICE_BOARD } from "../../lib/demo-data";
+
+// ----------------------------------------------------------------------------
+// DATA
+// ----------------------------------------------------------------------------
+
+type FloatingBadgeTone = "brand" | "accent" | "success";
+type FloatingItem = { emoji: string; title: string; meta: string; badge: { label: string; tone: FloatingBadgeTone }; price: string };
+const floatingCards: FloatingItem[] = [
+  { emoji: "🍲", title: "Asadero El Tamayo", meta: "Neiva · Premium", badge: { label: "✓ Verificado", tone: "success" }, price: "$ 38.000" },
+  { emoji: "💈", title: "Barbería El Poblado", meta: "Neiva · 4.8★", badge: { label: "⭐ Premium", tone: "brand" }, price: "$ 18.000" },
+  { emoji: "💄", title: "María Estética", meta: "Neiva · 4.9★", badge: { label: "💰 Acepta Saldo", tone: "accent" }, price: "$ 28.000" },
+  { emoji: "🏠", title: "Plomería Rivera", meta: "Neiva · 24/7", badge: { label: "✓ Verificado", tone: "success" }, price: "$ 45.000" },
+];
+
+type LivePriceItem = { producto: string; precio: number; trend: "up" | "down" | "stable"; trend_pct: number; ciudad: string };
+const livePriceItems: LivePriceItem[] = [...PRICE_BOARD, ...PRICE_BOARD].map((p) => ({
+  producto: p.producto,
+  precio: p.promedio_cop,
+  trend: p.trend,
+  trend_pct: p.trend_pct,
+  ciudad: p.ciudad_referencia,
+}));
+
+// Comparison table: Opita Market vs Temu vs TikTok vs MercadoLibre vs Páginas Amarillas
+const comparisonRows = [
+  { feature: "Modelo de negocio", opita: "Social commerce", temu: "Marketplace global", tiktok: "Creator network", mercadolibre: "Marketplace regional", paginasamarillas: "Directorio" },
+  { feature: "Foco en SMBs colombianos", opita: "✓", temu: "—", tiktok: "—", mercadolibre: "Parcial", paginasamarillas: "✓" },
+  { feature: "Verificación NIT (RUES) por defecto", opita: "✓", temu: "—", tiktok: "—", mercadolibre: "—", paginasamarillas: "Parcial" },
+  { feature: "Pagos sin tarjeta (Opita Saldo)", opita: "✓", temu: "—", tiktok: "—", mercadolibre: "—", paginasamarillas: "—" },
+  { feature: "Contenido UGC en video (TikTok-style)", opita: "✓", temu: "—", tiktok: "✓", mercadolibre: "—", paginasamarillas: "—" },
+  { feature: "Algoritmo transparente y explicable", opita: "✓", temu: "—", tiktok: "—", mercadolibre: "—", paginasamarillas: "—" },
+  { feature: "Comisión por venta", opita: "0%", temu: "5-8%", tiktok: "5-8%", mercadolibre: "13-16%", paginasamarillas: "—" },
+  { feature: "Creator economy para SMBs locales", opita: "✓", temu: "—", tiktok: "✓", mercadolibre: "—", paginasamarillas: "—" },
+  { feature: "Cumplimiento Ley 1581 Habeas Data", opita: "✓", temu: "—", tiktok: "Parcial", mercadolibre: "Parcial", paginasamarillas: "Parcial" },
+  { feature: "Auditoría externa completada", opita: "✓", temu: "Parcial", tiktok: "—", mercadolibre: "Parcial", paginasamarillas: "—" },
+];
+
+type RoadmapItem = { date: string; title: string; description: string; status: "done" | "current" | "upcoming"; tag?: string };
+const roadmap: RoadmapItem[] = [
+  { date: "Q1 2026", title: "Compliance foundation", description: "Habeas Data Ley 1581/2012, RNBD, DPO, Suprimir mi negocio. Auditoría externa 87 hallazgos cerrados (90/100).", status: "done", tag: "Shipped" },
+  { date: "Q2 2026", title: "Pagos + Opita Saldo + Lobby", description: "Opita Pagos multi-carril (Wompi, Bre-B, Nequi, Daviplata), Opita Saldo cerrado, lobby personalizable por negocio.", status: "done", tag: "Shipped" },
+  { date: "Jun 2026", title: "Investor demo + staging", description: "Esta página. Pentest Round 2 cerrado (89/101), staging en demo.market.opitacode.com.", status: "current", tag: "Live now" },
+  { date: "Q3 2026", title: "Feed social + creators (TikTok-style)", description: "Lanzamiento del feed de videos UGC con algoritmo de personalización + onboarding de 100 creadores en el Huila.", status: "upcoming", tag: "Q3 · Clave" },
+  { date: "Q4 2026", title: "Producción Huila + Eje cafetero", description: "Onboarding masivo de comerciantes, partnerships con alcaldías del Huila, expansión a Pereira/Manizales/Armenia.", status: "upcoming", tag: "Q4" },
+  { date: "Q1 2027", title: "Bogotá + Medellín + 5 verticales nuevos", description: "Capital + Antioquia. Expansión a verticales adicionales (autos, agro, salud). Meta: 50K negocios verificados.", status: "upcoming", tag: "Q1 2027" },
+  { date: "Q3 2027", title: "Colombia completa + LatAm", description: "Cali, Barranquilla, Cartagena. Piloto Ecuador y Perú. Series A.", status: "upcoming", tag: "Mid 2027" },
+];
+
+const testimonials = [
+  {
+    quote: "Antes no aparecía en Google, mis clientes me encontraban por voz. Ahora cuando buscan 'asadero en Neiva', aparezco en Opita Market con mis precios publicados. Las ventas subieron 40% en 3 meses.",
+    name: "María Lucía Vargas",
+    role: "Dueña, Asadero El Tamayo",
+    location: "Neiva, Huila",
+    initials: "ML",
+    rating: 5,
+  },
+  {
+    quote: "Lo que más me gusta es que Opita Saldo cierra el negocio sin que el cliente tenga que sacar tarjeta. La gente del pueblo paga con Nequi o Bre-B, y yo recibo al instante. Sin datéfono, sin complicaciones.",
+    name: "Don Pedro Ramírez",
+    role: "Maestro barbero, Barbería El Poblado",
+    location: "Neiva, Huila",
+    initials: "PR",
+    rating: 5,
+  },
+  {
+    quote: "Como restauradora en Pitalito, lo más difícil era competir con Neiva. Ahora con el precio-board, los mayoristas me contactan a mí directamente. Mi margen mejoró 8 puntos en un trimestre.",
+    name: "Lucía Bermúdez",
+    role: "Restaurante Doña Lucía",
+    location: "Pitalito, Huila",
+    initials: "LB",
+    rating: 5,
+  },
+];
+
+type TrustedByItem = { emoji: string; label: string };
+const trustedByItems: TrustedByItem[] = [
+  { emoji: "🍲", label: "Restaurantes" },
+  { emoji: "💈", label: "Barberías" },
+  { emoji: "💄", label: "Centros de belleza" },
+  { emoji: "🏠", label: "Servicios del hogar" },
+  { emoji: "☕", label: "Cafés" },
+  { emoji: "🍞", label: "Panaderías" },
+  { emoji: "🥩", label: "Cárnicos" },
+  { emoji: "🛒", label: "Tiendas" },
+  { emoji: "💊", label: "Farmacias" },
+  { emoji: "🎨", label: "Artesanías" },
+  { emoji: "🚗", label: "Talleres" },
+  { emoji: "🏨", label: "Hoteles" },
+];
+---
+
+<DemoLayout title="Opita Market — El social commerce del SMB colombiano">
+  {/* ============================================================== */}
+  {/* ACT 1: HERO — gradient mesh + floating cards                     */}
+  {/* ============================================================== */}
+  <section class="relative isolate overflow-hidden bg-mesh-hero">
+    <BgPattern pattern="dots" tone="warm" opacity={0.35} />
+    <div class="absolute -top-40 -right-40 w-[640px] h-[640px] rounded-full bg-gradient-to-br from-brand-200 to-accent-200 opacity-30 blur-3xl"></div>
+    <div class="absolute -bottom-40 -left-40 w-[540px] h-[540px] rounded-full bg-gradient-to-br from-accent-200 to-brand-100 opacity-25 blur-3xl"></div>
+
+    <Container class="relative py-20 sm:py-24 lg:py-32">
+      <div class="grid lg:grid-cols-12 gap-12 items-center">
+        <div class="lg:col-span-7 space-y-7">
+          <div class="animate-fade-up">
+            <Badge variant="brand">Para inversores · Q3 2026</Badge>
+          </div>
+
+          <h1 class="hero-headline text-balance animate-fade-up delay-100">
+            El <span class="text-gradient-warm">social commerce</span> del SMB colombiano. Empezando por donde nadie llega.
+          </h1>
+
+          <p class="text-xl sm:text-2xl text-ink-700 leading-relaxed max-w-2xl animate-fade-up delay-200 text-pretty">
+            Marketplace + feed de videos UGC + creator economy + pagos sin tarjeta. <strong>Un solo producto</strong> para 2.5 millones de PyMEs que hoy son invisibles para sus propios clientes.
+          </p>
+
+          <div class="flex flex-col sm:flex-row gap-3 animate-fade-up delay-300">
+            <Button href="#feed" variant="primary" size="lg">
+              🎬 Ver el feed en vivo
+            </Button>
+            <Button href="#price-board" variant="outline" size="lg">
+              Ver precios del Huila hoy →
+            </Button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-4 pt-4 animate-fade-up delay-400">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-50 border border-accent-200">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-accent-500 text-white font-black text-xs">+100</span>
+              <span class="text-sm font-medium text-accent-900">OpiCoins de bienvenida — sin tarjeta</span>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-ink-50 border border-ink-200">
+              <span class="text-xs font-semibold text-ink-700">📜 Cumplimiento Ley 1581/2012</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 relative h-[440px] lg:h-[520px] hidden sm:block animate-fade-in delay-500">
+          <FloatingCards items={floatingCards} />
+        </div>
+      </div>
+
+      <div class="mt-16 lg:mt-20 grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8 pt-10 border-t border-ink-200/60">
+        <StatCounter value="820" suffix="+" label="Negocios verificados" tone="brand" size="lg" />
+        <StatCounter value="37" label="Municipios del Huila" tone="default" size="lg" />
+        <StatCounter value="12.4K" label="Precios publicados" tone="default" size="lg" />
+        <StatCounter value="3.4K" label="Actualizaciones hoy" tone="default" size="lg" />
+      </div>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 2: TRUSTED BY marquee                                          */}
+  {/* ============================================================== */}
+  <section class="bg-ink-50 border-y border-ink-200 py-6">
+    <Container>
+      <div class="flex items-center gap-4 mb-4">
+        <span class="text-xs font-bold uppercase tracking-widest text-ink-500 whitespace-nowrap">En el marketplace</span>
+        <div class="flex-1 h-px bg-ink-200"></div>
+      </div>
+      <div class="relative overflow-hidden">
+        <div class="flex w-max animate-marquee-slow hover:[animation-play-state:paused]" style="gap: 0.75rem;">
+          {[...trustedByItems, ...trustedByItems].map((item, i) => (
+            <div class="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full bg-surface-elevated border border-border shadow-sm" aria-hidden={i >= trustedByItems.length}>
+              <span class="text-lg" aria-hidden="true">{item.emoji}</span>
+              <span class="text-sm font-medium text-ink-700 whitespace-nowrap">{item.label}</span>
+            </div>
+          ))}
+        </div>
+        <div class="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-ink-50 to-transparent"></div>
+        <div class="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-r from-transparent to-ink-50"></div>
+      </div>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 3: EL PROBLEMA                                                */}
+  {/* ============================================================== */}
+  <section class="relative isolate bg-mesh-dark text-ink-50 overflow-hidden">
+    <BgPattern pattern="grid" tone="dark" opacity={0.5} />
+    <Container class="relative py-20 sm:py-28">
+      <div class="max-w-3xl mb-14">
+        <Badge variant="brand">El problema</Badge>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+          En Colombia, <span class="text-gradient-warm">2.5 millones de PyMEs</span> son invisibles para sus propios clientes.
+        </h2>
+        <p class="text-lg sm:text-xl text-ink-300 leading-relaxed text-pretty">
+          Un tendero en La Plata que vende el mejor café del Huila no aparece cuando alguien busca "café cerca" en Google. Un barbero en Garzón pierde clientes porque su tienda no tiene página web. La dueña de un restaurante en Pitalito paga comisiones brutales a MercadoLibre sin saber que existen alternativas.
+        </p>
+      </div>
+
+      <div class="grid sm:grid-cols-3 gap-6">
+        <div class="p-6 rounded-2xl bg-ink-800/50 border border-ink-700 backdrop-blur-sm">
+          <div class="text-5xl font-black text-danger mb-2">76%</div>
+          <div class="text-sm text-ink-200 leading-relaxed">de PyMEs colombianas <strong>no tienen presencia digital</strong> verificable</div>
+        </div>
+        <div class="p-6 rounded-2xl bg-ink-800/50 border border-ink-700 backdrop-blur-sm">
+          <div class="text-5xl font-black text-warning mb-2">13-16%</div>
+          <div class="text-sm text-ink-200 leading-relaxed">de comisión promedio en marketplaces generalistas — 5-7% se va en logística</div>
+        </div>
+        <div class="p-6 rounded-2xl bg-ink-800/50 border border-ink-700 backdrop-blur-sm">
+          <div class="text-5xl font-black text-brand-400 mb-2">$0</div>
+          <div class="text-sm text-ink-200 leading-relaxed">es lo que recibe un tendero cuando alguien busca su negocio en Google Maps</div>
+        </div>
+      </div>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 4: CÓMO FUNCIONA — 3 pasos                                  */}
+  {/* ============================================================== */}
+  <section class="relative bg-mesh-warm">
+    <Container class="py-20 sm:py-28">
+      <div class="max-w-3xl mx-auto text-center mb-16">
+        <Badge variant="brand">Cómo funciona</Badge>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+          Tres pasos. <span class="text-gradient">Menos de 60 segundos.</span>
+        </h2>
+        <p class="text-lg sm:text-xl text-ink-600 leading-relaxed text-pretty">
+          Diseñado para la dueña del restaurante en Pitalito que nunca ha usado una app. Diseñado para el tendero de Neiva que solo tiene WhatsApp. Diseñado para Colombia real.
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6 lg:gap-8">
+        <Card padding="lg" class="card-hover animate-fade-up">
+          <div class="flex items-center justify-between mb-5">
+            <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 items-center justify-center text-white text-2xl shadow-lg shadow-brand-500/20">1</div>
+            <Badge variant="brand" size="sm">Celular</Badge>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Verificas tu número</h3>
+          <p class="text-ink-600 text-sm leading-relaxed">Recibes un SMS con código. Sin correo, sin contraseñas complicadas. Solo tu celular. 100 OpiCoins de regalo.</p>
+        </Card>
+
+        <Card padding="lg" class="card-hover animate-fade-up delay-200">
+          <div class="flex items-center justify-between mb-5">
+            <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-500 to-accent-700 items-center justify-center text-white text-2xl shadow-lg shadow-accent-500/20">2</div>
+            <Badge variant="accent" size="sm">NIT</Badge>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Reclamas tu negocio</h3>
+          <p class="text-ink-600 text-sm leading-relaxed">Buscamos tu razón social en RUES automáticamente. Validamos el NIT. En 24h tienes tu perfil verificado con badge verde.</p>
+        </Card>
+
+        <Card padding="lg" class="card-hover animate-fade-up delay-300">
+          <div class="flex items-center justify-between mb-5">
+            <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 items-center justify-center text-white text-2xl shadow-lg shadow-sky-500/20">3</div>
+            <Badge variant="sky" size="sm">Publicas</Badge>
+          </div>
+          <h3 class="text-xl font-bold mb-2">Publicas tus precios</h3>
+          <p class="text-ink-600 text-sm leading-relaxed">Subes tu menú, tus servicios, tus precios. La gente del Huila te encuentra. Recibes pagos con Opita Saldo.</p>
+        </Card>
+      </div>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 5: EL FEED — TikTok-style product video feed (NEW)            */}
+  {/* ============================================================== */}
+  <div id="feed"></div>
+  <FeedShowcase />
+
+  {/* ============================================================== */}
+  {/* ACT 6: VERTICAL SHOWCASE                                         */}
+  {/* ============================================================== */}
+  <section class="relative bg-background">
+    <Container class="py-20 sm:py-28">
+      <div class="max-w-3xl mx-auto text-center mb-14">
+        <Badge variant="brand">Cuatro verticales</Badge>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+          Una plataforma. <span class="text-gradient">Infinitas verticales.</span>
+        </h2>
+        <p class="text-lg sm:text-xl text-ink-600 leading-relaxed text-pretty">
+          Empezamos con las cuatro que mueven la economía regional del Huila. El mismo motor rankea, verifica y publica para cada una.
+        </p>
+      </div>
+
+      <BentoGrid cols={4}>
+        {Object.values(VERTICALES).map((v, i) => (
+          <BentoCard span={i === 0 ? "lg" : "md"} tone={i === 2 ? "accent" : i === 1 ? "brand" : "warm"} interactive class={`animate-fade-up delay-${i * 100}`}>
+            <a href={`/demo/${v.slug}`} class="block h-full">
+              <div class="relative aspect-[16/10] rounded-xl overflow-hidden mb-4 -m-2 mb-4">
+                <img
+                  src={`/demo/verticals/${v.slug}.png`}
+                  alt={v.nombre}
+                  loading="lazy"
+                  decoding="async"
+                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                <div class="absolute top-3 left-3 text-3xl" aria-hidden="true">{v.emoji}</div>
+              </div>
+              <h3 class="font-bold text-xl mb-1 leading-tight">{v.nombre}</h3>
+              <p class="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-3">{v.subtitulo}</p>
+              <p class="text-sm text-ink-600 leading-relaxed line-clamp-3">{v.descripcion}</p>
+              <div class="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                <span class="text-xs text-ink-500">{v.pruebaSocial}</span>
+                <span class="text-sm font-semibold text-brand-700">→</span>
+              </div>
+            </a>
+          </BentoCard>
+        ))}
+      </BentoGrid>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 7: LIVE PRICE BOARD                                          */}
+  {/* ============================================================== */}
+  <section id="price-board" class="relative bg-ink-950 text-ink-50 overflow-hidden">
+    <BgPattern pattern="grid" tone="dark" opacity={0.4} />
+    <div class="absolute inset-0 bg-gradient-to-br from-ink-950 via-ink-900 to-ink-950"></div>
+
+    <Container class="relative py-20 sm:py-28">
+      <div class="grid lg:grid-cols-12 gap-12 items-center">
+        <div class="lg:col-span-5">
+          <Badge variant="brand">LIVE · Opita Foods B2B</Badge>
+          <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+            Precios del Huila hoy. <span class="text-gradient-warm">Sin llamadas.</span>
+          </h2>
+          <p class="text-lg text-ink-300 leading-relaxed mb-6">
+            Para restaurantes, tiendas y mayoristas: el precio que ves es el precio que pagas. Actualizado por los mismos productores cada hora.
+          </p>
+          <Button href="/demo/foods" variant="primary" size="lg" class="mt-8">Ver price-board completo →</Button>
+        </div>
+
+        <div class="lg:col-span-7">
+          <div class="rounded-2xl bg-ink-900/80 border border-ink-700 backdrop-blur-sm p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-accent-500 animate-pulse-soft"></span>
+                <span class="text-xs font-semibold text-accent-400 uppercase tracking-wide">Live</span>
+              </div>
+              <span class="text-xs text-ink-400">Promedio · Huila · hoy</span>
+            </div>
+            <div class="relative overflow-hidden">
+              <div class="flex w-max animate-marquee-slow hover:[animation-play-state:paused]" style="gap: 0.5rem;">
+                {[...livePriceItems, ...livePriceItems].map((p, i) => (
+                  <div class="flex-shrink-0 bg-ink-800/60 rounded-xl p-3 border border-ink-700 min-w-[180px]" aria-hidden={i >= livePriceItems.length}>
+                    <div class="text-xs text-ink-400 truncate">{p.producto}</div>
+                    <div class="text-lg font-bold text-ink-50 tabular-nums mt-1">
+                      {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(p.precio)}
+                    </div>
+                    <div class="flex items-center justify-between mt-1 text-xs">
+                      <span class="text-ink-500">{p.ciudad}</span>
+                      <span class:list={["font-medium", p.trend === "up" ? "text-danger" : p.trend === "down" ? "text-accent-400" : "text-ink-400"]}>
+                        <span aria-hidden="true">{p.trend === "up" ? "↑" : p.trend === "down" ? "↓" : "→"}</span> {Math.abs(p.trend_pct).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-ink-500 mt-4 italic text-center">
+            Datos de demostración · En producción, precios actualizados por productores cada hora
+          </p>
+        </div>
+      </div>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 8: EL ALGORITMO — deep dive with worked examples (UPGRADED) */}
+  {/* ============================================================== */}
+  <ChapterMarker number="05" title="El algoritmo" subtitle="No es magia. Es matemática transparente: cada recomendación es un cálculo visible que puedes auditar." tone="light" />
+  <AlgorithmDeepDive />
+
+  {/* ============================================================== */}
+  {/* ACT 9: CREADORES — creator economy (NEW)                          */}
+  {/* ============================================================== */}
+  <ChapterMarker number="06" title="Creadores" subtitle="Cualquier persona con celular y carisma puede monetizar mostrando los negocios del Huila." tone="warm" />
+  <CreatorEconomy />
+
+  {/* ============================================================== */}
+  {/* ACT 10: EL FLYWHEEL — B2C × B2B connection (NEW)                  */}
+  {/* ============================================================== */}
+  <ChapterMarker number="07" title="El flywheel" subtitle="El círculo virtuoso: cada consumidor atrae negocios, cada negocio atrae consumidores. La red se refuerza sola." tone="dark" />
+  <Flywheel />
+
+  {/* ============================================================== */}
+  {/* ACT 11: PARA NEGOCIOS vs PARA PERSONAS                            */}
+  {/* ============================================================== */}
+  <section class="bg-background">
+    <Container class="py-20 sm:py-28">
+      <div class="max-w-3xl mx-auto text-center mb-14">
+        <Badge variant="brand">Diseñado para los dos lados</Badge>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+          Resolvemos los dos lados del marketplace.
+        </h2>
+        <p class="text-lg sm:text-xl text-ink-600 leading-relaxed text-pretty">
+          El tendero y el cliente son personas diferentes con dolores diferentes. Diseñamos flujos específicos para cada uno.
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6 lg:gap-8">
+        <div class="relative rounded-3xl bg-gradient-to-br from-brand-50 via-brand-50/50 to-accent-50/40 border border-brand-200 p-8 lg:p-10 overflow-hidden card-hover">
+          <BgPattern pattern="coffee" tone="warm" opacity={0.25} />
+          <div class="relative">
+            <Badge variant="brand" size="md">Para tu negocio</Badge>
+            <h3 class="text-3xl font-black mt-4 mb-3 leading-tight">Dueño de restaurante, tienda o servicio</h3>
+            <p class="text-ink-700 leading-relaxed mb-6">Reclama tu perfil gratis. Publica tu menú o servicios. Recibe clientes del Huila con Opita Saldo.</p>
+            <ul class="space-y-2.5 mb-8">
+              <li class="flex items-start gap-2 text-sm"><span class="text-accent-700 font-bold">✓</span><span>Verificación NIT automática en 24h</span></li>
+              <li class="flex items-start gap-2 text-sm"><span class="text-accent-700 font-bold">✓</span><span>Hasta <strong>5.000 productos</strong> publicados sin costo</span></li>
+              <li class="flex items-start gap-2 text-sm"><span class="text-accent-700 font-bold">✓</span><span>Comisión <strong>0%</strong> sobre ventas — siempre</span></li>
+              <li class="flex items-start gap-2 text-sm"><span class="text-accent-700 font-bold">✓</span><span>Pagos con Nequi, Bre-B, Daviplata o tarjeta</span></li>
+              <li class="flex items-start gap-2 text-sm"><span class="text-accent-700 font-bold">✓</span><span>Suprimir tu negocio cuando quieras (Habeas Data)</span></li>
+            </ul>
+            <Button variant="primary" class="w-full">Reclamar mi negocio gratis →</Button>
+          </div>
+        </div>
+
+        <div class="relative rounded-3xl bg-gradient-to-br from-accent-50 via-accent-50/50 to-brand-50/40 border border-accent-200 p-8 lg:p-10 overflow-hidden card-hover">
+          <BgPattern pattern="andean" tone="cool" opacity={0.25} />
+          <div class="relative">
+            <Badge variant="accent" size="md">Para ti</Badge>
+            <h3 class="text-3xl font-black mt-4 mb-3 leading-tight">Consumidor en el Huila</h3>
+            <p class="text-ink-700 leading-relaxed mb-6">Encuentra restaurantes, barberías, centros de belleza y servicios del hogar del Huila con precios publicados.</p>
+            <ul class="space-y-2.5 mb-8">
+              <li class="flex items-start gap-2 text-sm"><span class="text-brand-700 font-bold">✓</span><span><strong>100 OpiCoins</strong> de regalo al registrarte</span></li>
+              <li class="flex items-start gap-2 text-sm"><span class="text-brand-700 font-bold">✓</span><span>Precios reales, no "llámanos para confirmar"</span></li>
+              <li class="flex items-start gap-2 text-sm"><span class="text-brand-700 font-bold">✓</span><span>Reseñas de clientes verificados</span></li>
+              <li class="flex items-start gap-2 text-sm"><span class="text-brand-700 font-bold">✓</span><span>Pago con Opita Saldo, Nequi, Bre-B, Daviplata</span></li>
+              <li class="flex items-start gap-2 text-sm"><span class="text-brand-700 font-bold">✓</span><span>Tus datos protegidos por Ley 1581/2012</span></li>
+            </ul>
+            <Button variant="accent" class="w-full">Crear cuenta gratis →</Button>
+          </div>
+        </div>
+      </div>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 12: COMPARISON TABLE — vs Temu + TikTok + MercadoLibre + PA  */}
+  {/* ============================================================== */}
+  <section class="relative bg-mesh-warm">
+    <Container class="py-20 sm:py-28">
+      <div class="max-w-3xl mx-auto text-center mb-14">
+        <Badge variant="brand">Comparación honesta</Badge>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+          No somos <span class="line-through text-ink-500">Temu</span>. No somos <span class="line-through text-ink-500">TikTok</span>. Somos algo nuevo.
+        </h2>
+        <p class="text-lg sm:text-xl text-ink-600 leading-relaxed text-pretty">
+          Cada uno de estos productos resolvió una parte del problema. Opita Market los combina en uno solo, con foco en el SMB colombiano.
+        </p>
+      </div>
+
+      <ComparisonTable
+        rows={comparisonRows}
+        caption="Comparación funcional — datos sintéticos representativos del estado del mercado 2026"
+      />
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 13: TESTIMONIALS                                              */}
+  {/* ============================================================== */}
+  <section class="relative bg-mesh-warm">
+    <BgPattern pattern="lines" tone="warm" opacity={0.3} />
+    <Container class="relative py-20 sm:py-28">
+      <div class="max-w-3xl mx-auto text-center mb-14">
+        <Badge variant="brand">Lo que dicen los comerciantes</Badge>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+          <span class="text-gradient-warm">Historias reales</span> del Huila.
+        </h2>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6">
+        {testimonials.map((t, i) => (
+          <div class={`animate-fade-up delay-${i * 100}`}>
+            <Testimonial {...t} variant={i === 1 ? "brand" : "default"} />
+          </div>
+        ))}
+      </div>
+
+      <div class="text-center mt-12">
+        <p class="text-sm text-ink-500 italic">Testimonios compuestos con fines demostrativos. Nombres reales se publicarán con consentimiento una vez en producción.</p>
+      </div>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 14: ROADMAP                                                   */}
+  {/* ============================================================== */}
+  <section class="relative bg-background">
+    <Container class="py-20 sm:py-28">
+      <div class="grid lg:grid-cols-12 gap-12 items-start">
+        <div class="lg:col-span-4">
+          <Badge variant="brand">Roadmap público</Badge>
+          <h2 class="text-4xl sm:text-5xl font-black mt-5 mb-6 tracking-tight text-balance">
+            Construimos en <span class="text-gradient">público</span>, con datos y fechas.
+          </h2>
+          <p class="text-ink-600 leading-relaxed mb-6">Cada trimestre publicamos lo que se hizo, lo que viene y por qué. Sin vaporware.</p>
+          <div class="space-y-2 text-sm">
+            <a href="https://staging.opita-market-dev.pages.dev" class="block text-brand-700 hover:underline">📦 Ver staging →</a>
+            <a href="#" class="block text-brand-700 hover:underline">📋 Bitácora de commits →</a>
+            <a href="#" class="block text-brand-700 hover:underline">🔍 Reporte de pentest →</a>
+          </div>
+        </div>
+        <div class="lg:col-span-8">
+          <Timeline items={roadmap} />
+        </div>
+      </div>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 15: COMPLIANCE & SEGURIDAD                                    */}
+  {/* ============================================================== */}
+  <section class="relative bg-mesh-dark text-ink-50">
+    <BgPattern pattern="grid" tone="dark" opacity={0.4} />
+    <Container class="relative py-20 sm:py-28">
+      <div class="text-center max-w-3xl mx-auto mb-14">
+        <Badge variant="brand">Compliance & seguridad</Badge>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+          Tus datos son tuyos. <span class="text-gradient-warm">Los respetamos.</span>
+        </h2>
+        <p class="text-lg sm:text-xl text-ink-300 leading-relaxed text-pretty">
+          Cumplimiento total de la Ley 1581/2012 de Habeas Data y la SIC. Auditoría externa completada. Operador con DPO designado desde día 1.
+        </p>
+      </div>
+
+      <BentoGrid cols={4}>
+        <BentoCard tone="dark">
+          <div class="text-3xl mb-3">🔒</div>
+          <h3 class="font-bold text-ink-50 mb-1.5 text-base">Verificado por RUES</h3>
+          <p class="text-xs text-ink-300 leading-relaxed">Cada negocio pasa por validación NIT + DV contra Confecámaras.</p>
+        </BentoCard>
+        <BentoCard tone="dark">
+          <div class="text-3xl mb-3">🛡️</div>
+          <h3 class="font-bold text-ink-50 mb-1.5 text-base">"Suprimir mi negocio"</h3>
+          <p class="text-xs text-ink-300 leading-relaxed">Cualquier dueño puede pedir que borremos su negocio. Verificación NIT en 24h.</p>
+        </BentoCard>
+        <BentoCard tone="dark">
+          <div class="text-3xl mb-3">⚖️</div>
+          <h3 class="font-bold text-ink-50 mb-1.5 text-base">DPO designado</h3>
+          <p class="text-xs text-ink-300 leading-relaxed">Respondemos derechos del titular en máximo 15 días hábiles.</p>
+        </BentoCard>
+        <BentoCard tone="dark">
+          <div class="text-3xl mb-3">📋</div>
+          <h3 class="font-bold text-ink-50 mb-1.5 text-base">Auditoría externa</h3>
+          <p class="text-xs text-ink-300 leading-relaxed">90/100 hallazgos cerrados. Auditor Round 2: 89/101. Reportes públicos.</p>
+        </BentoCard>
+      </BentoGrid>
+
+      <div class="mt-12 text-center">
+        <div class="inline-flex flex-wrap justify-center gap-3">
+          <a href="/legal/ptd" class="px-5 py-2.5 rounded-lg bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors">Leer PTD completa</a>
+          <a href="/legal/aviso" class="px-5 py-2.5 rounded-lg border border-ink-600 text-ink-100 font-semibold hover:bg-ink-800 transition-colors">Aviso de Privacidad</a>
+          <a href="/admin/dpo" class="px-5 py-2.5 rounded-lg border border-ink-600 text-ink-100 font-semibold hover:bg-ink-800 transition-colors">Dashboard DPO</a>
+        </div>
+      </div>
+    </Container>
+  </section>
+
+  {/* ============================================================== */}
+  {/* ACT 16: FINAL CTA — investor focused                              */}
+  {/* ============================================================== */}
+  <section class="relative bg-mesh-hero">
+    <BgPattern pattern="blobs" tone="warm" opacity={0.5} />
+    <Container class="relative py-24 sm:py-32">
+      <div class="text-center max-w-3xl mx-auto">
+        <Badge variant="brand">Inversión Serie Seed · Q3 2026</Badge>
+        <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+          Estamos construyendo el <span class="text-gradient-warm">social commerce</span> de 2.5 millones de PyMEs colombianas.
+        </h2>
+        <p class="text-lg sm:text-xl text-ink-700 leading-relaxed mb-10 text-pretty">
+          Si eres inversor o founder con thesis en marketplaces verticales, social commerce, creator economy o inclusión financiera en LATAM, hablemos.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button href="mailto:investors@opita.market" variant="primary" size="lg">
+            Agendar llamada con el operador →
+          </Button>
+          <Button href="#feed" variant="outline" size="lg">
+            Ver el feed en vivo
+          </Button>
+        </div>
+        <div class="mt-10 grid grid-cols-3 gap-4 text-center max-w-xl mx-auto">
+          <div>
+            <div class="text-2xl font-black text-ink-900">$50/mo</div>
+            <div class="text-xs text-ink-600 mt-1">Costo infra MiniMax</div>
+          </div>
+          <div>
+            <div class="text-2xl font-black text-ink-900">$1-5</div>
+            <div class="text-xs text-ink-600 mt-1">Costo por 1K listings</div>
+          </div>
+          <div>
+            <div class="text-2xl font-black text-ink-900">35.7%</div>
+            <div class="text-xs text-ink-600 mt-1">CAGR social commerce LATAM</div>
+          </div>
+        </div>
+      </div>
+    </Container>
+  </section>
+</DemoLayout>

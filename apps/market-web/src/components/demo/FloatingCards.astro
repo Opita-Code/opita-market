@@ -1,0 +1,82 @@
+---
+/**
+ * FloatingCards — animated floating business cards for the hero.
+ * Pure CSS animations (float-slow + float-slower + stagger).
+ *
+ * Usage:
+ *   <FloatingCards items={businesses} />
+ */
+interface FloatingItem {
+  emoji?: string;
+  title: string;
+  meta?: string;
+  badge?: { label: string; tone?: "brand" | "accent" | "success" };
+  price?: string;
+}
+
+interface Props {
+  items: FloatingItem[];
+  class?: string;
+}
+
+const { items, class: className = "" } = Astro.props;
+
+const badgeToneClass: Record<NonNullable<NonNullable<FloatingItem["badge"]>["tone"]>, string> = {
+  brand: "bg-brand-100 text-brand-800 border-brand-200",
+  accent: "bg-accent-100 text-accent-800 border-accent-200",
+  success: "bg-accent-100 text-accent-800 border-accent-300",
+};
+---
+
+<div class:list={["relative w-full h-full", className]}>
+  {items.map((item, i) => {
+    const positions = [
+      "top-[8%] left-[2%] lg:left-[5%]",
+      "top-[2%] right-[4%] lg:right-[8%]",
+      "bottom-[8%] left-[6%] lg:left-[12%]",
+      "bottom-[2%] right-[2%] lg:right-[5%]",
+      "top-[45%] right-[20%] hidden lg:flex",
+    ];
+    const animations = ["animate-float-slow", "animate-float-slower", "animate-float-slow", "animate-float-slower", "animate-float-slow"];
+    const delays = ["", "delay-200", "delay-400", "delay-300", "delay-500"];
+
+    return (
+      <div
+        class:list={[
+          "absolute backdrop-blur-md bg-white/90 border border-white/60 rounded-2xl shadow-lg p-4 w-44 lg:w-52",
+          positions[i] ?? positions[0],
+          animations[i] ?? animations[0],
+          delays[i],
+        ]}
+        style={`z-index: ${10 - i}`}
+      >
+        <div class="flex items-start gap-2.5">
+          {item.emoji && (
+            <div class="text-2xl flex-shrink-0" aria-hidden="true">{item.emoji}</div>
+          )}
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold text-ink-900 text-sm leading-tight truncate">{item.title}</div>
+            {item.meta && (
+              <div class="text-xs text-ink-500 mt-0.5 truncate">{item.meta}</div>
+            )}
+          </div>
+        </div>
+        {item.badge && (
+          <div class="mt-2.5">
+            <span
+              class:list={[
+                "inline-block text-[0.625rem] font-semibold px-1.5 py-0.5 rounded-full border",
+                badgeToneClass[item.badge.tone ?? "success"],
+              ]}
+            >
+              {item.badge.label}
+            </span>
+          </div>
+        )}
+        {item.price && (
+          <div class="mt-2 text-sm font-bold text-brand-700">{item.price}</div>
+        )}
+      </div>
+    );
+  })}
+</div>

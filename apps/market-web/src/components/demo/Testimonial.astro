@@ -1,0 +1,92 @@
+---
+/**
+ * Testimonial — quote card with avatar and metadata.
+ *
+ * Usage:
+ *   <Testimonial
+ *     quote="..."
+ *     name="María Lucía Vargas"
+ *     role="Dueña, Asadero El Tamayo"
+ *     location="Neiva, Huila"
+ *     avatar="/demo/avatars/maria.png"
+ *     initials="ML"
+ *     rating={5}
+ *     variant="brand"
+ *   />
+ */
+interface Props {
+  quote: string;
+  name: string;
+  role: string;
+  location?: string;
+  avatar?: string;
+  initials?: string;
+  rating?: number;
+  variant?: "default" | "brand" | "accent" | "dark";
+  size?: "md" | "lg";
+  class?: string;
+}
+
+const {
+  quote,
+  name,
+  role,
+  location,
+  avatar,
+  initials,
+  rating = 5,
+  variant = "default",
+  size = "md",
+  class: className = "",
+} = Astro.props;
+
+const variantMap = {
+  default: "bg-surface-elevated border border-border",
+  brand: "bg-gradient-to-br from-brand-50 to-accent-50 border border-brand-200",
+  accent: "bg-gradient-to-br from-accent-50 to-brand-50 border border-accent-200",
+  dark: "bg-gradient-to-br from-ink-900 to-ink-800 border border-ink-700 text-ink-50",
+};
+
+const textPrimary = variant === "dark" ? "text-ink-50" : "text-ink-900";
+const textSecondary = variant === "dark" ? "text-ink-300" : "text-ink-600";
+---
+
+<figure class:list={["rounded-2xl p-8 shadow-sm card-hover", variantMap[variant], size === "lg" ? "p-10" : "p-8", className]}>
+  {/* Quote mark decoration */}
+  <svg class="w-10 h-10 mb-3 text-brand-300" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M9.983 3v7.391c0 5.704-3.731 9.57-8.983 10.609l-.995-2.151c2.432-.917 3.995-3.638 3.995-5.849h-4v-10h9.983zm14.017 0v7.391c0 5.704-3.748 9.571-9 10.609l-.996-2.151c2.433-.917 3.996-3.638 3.996-5.849h-3.983v-10h9.983z"/>
+  </svg>
+
+  {/* Stars */}
+  {rating > 0 && (
+    <div class="flex gap-0.5 mb-4 text-warning">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <span class="text-base">{i < rating ? "★" : "☆"}</span>
+      ))}
+    </div>
+  )}
+
+  <blockquote class:list={["leading-relaxed mb-6 text-pretty", size === "lg" ? "text-xl" : "text-base", textPrimary]}>
+    "{quote}"
+  </blockquote>
+
+  <figcaption class="flex items-center gap-3">
+    {avatar ? (
+      <img src={avatar} alt={name} width="48" height="48" class="w-12 h-12 rounded-full object-cover ring-2 ring-white" />
+    ) : (
+      <div
+        class:list={[
+          "w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm ring-2 ring-white",
+          variant === "dark" ? "bg-brand-600 text-white" : "bg-gradient-to-br from-brand-500 to-accent-500 text-white",
+        ]}
+      >
+        {initials ?? name.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase()}
+      </div>
+    )}
+    <div class="min-w-0">
+      <div class:list={["font-semibold leading-tight", textPrimary]}>{name}</div>
+      <div class:list={["text-sm leading-tight", textSecondary]}>{role}</div>
+      {location && <div class:list={["text-xs mt-0.5", variant === "dark" ? "text-ink-400" : "text-ink-500"]}>📍 {location}</div>}
+    </div>
+  </figcaption>
+</figure>

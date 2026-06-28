@@ -1,0 +1,49 @@
+---
+/**
+ * PriceBoardRow — single row in the B2B price board.
+ *
+ * Usage:
+ *   <PriceBoardRow entry={entry} />
+ */
+import { formatCOP, type PriceBoardEntry } from "../../lib/demo-data";
+import Badge from "./Badge.astro";
+
+interface Props {
+  entry: PriceBoardEntry;
+}
+
+const { entry } = Astro.props;
+
+const trendIcon = entry.trend === "up" ? "↑" : entry.trend === "down" ? "↓" : "→";
+const trendColor =
+  entry.trend === "up"
+    ? "text-danger"
+    : entry.trend === "down"
+      ? "text-accent-700"
+      : "text-ink-500";
+---
+
+<tr class="border-b border-border last:border-0 hover:bg-surface transition-colors">
+  <td class="py-3 px-4">
+    <div class="font-medium text-ink-900">{entry.producto}</div>
+    <div class="text-xs text-ink-500">{entry.categoria}</div>
+  </td>
+  <td class="py-3 px-4 text-right text-ink-700 tabular-nums">
+    {formatCOP(entry.precio_min_cop)}
+  </td>
+  <td class="py-3 px-4 text-right text-ink-700 tabular-nums">
+    {formatCOP(entry.precio_max_cop)}
+  </td>
+  <td class="py-3 px-4 text-right font-semibold text-ink-900 tabular-nums">
+    {formatCOP(entry.promedio_cop)}
+  </td>
+  <td class="py-3 px-4 text-center text-sm">
+    <span class:list={["inline-flex items-center gap-1 font-medium", trendColor]}>
+      {trendIcon}
+      {entry.trend_pct === 0 ? "estable" : `${Math.abs(entry.trend_pct).toFixed(1)}%`}
+    </span>
+  </td>
+  <td class="py-3 px-4 text-center text-xs text-ink-500 hidden sm:table-cell">
+    {entry.vendors_count} locales
+  </td>
+</tr>

@@ -1,0 +1,254 @@
+---
+/**
+ * AlgorithmDeepDive — full worked example of the ranking algorithm.
+ *
+ * Shows: input context → candidate evaluation → factor breakdown → final ranking.
+ * Includes "why this won, why that lost" insight + competitive comparison.
+ *
+ * Usage:
+ *   <AlgorithmDeepDive traceId="neiva-arepas" />
+ *   <AlgorithmDeepDive />  (uses first trace by default)
+ */
+import {
+  TRACES_DETALLADOS,
+  FACTOR_DETALLES,
+  getTraceById,
+  type WorkedTrace,
+  type Factor,
+} from "../../lib/algorithm";
+import Badge from "./Badge.astro";
+import Card from "./Card.astro";
+
+interface Props {
+  traceId?: string;
+  showAllTraces?: boolean;
+}
+
+const { traceId, showAllTraces = false } = Astro.props;
+
+const primaryTrace: WorkedTrace = (traceId ? getTraceById(traceId) : undefined) ?? TRACES_DETALLADOS[0]!;
+
+const factorIcons: Record<Factor, string> = {
+  geo: "📍",
+  verificado: "✓",
+  acepta_saldo: "💰",
+  recencia: "🕐",
+  reputacion: "⭐",
+};
+
+const factorOrder: Factor[] = ["geo", "verificado", "acepta_saldo", "recencia", "reputacion"];
+---
+
+<section class="relative bg-mesh-cool" data-reveal>
+  <div class="absolute inset-0 bg-dot-grid opacity-30" aria-hidden="true"></div>
+
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
+    {/* Header */}
+    <div class="max-w-3xl mx-auto text-center mb-16">
+      <Badge variant="brand">Capítulo 04 · El algoritmo</Badge>
+      <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+        No es magia. <span class="text-gradient-cool">Es matemática transparente.</span>
+      </h2>
+      <p class="text-lg sm:text-xl text-ink-600 leading-relaxed text-pretty">
+        Cada recomendación es un cálculo visible. Te mostramos exactamente por qué ese negocio quedó primero y los demás quedaron atrás.
+      </p>
+    </div>
+
+    {/* The 5 factors as pillars */}
+    <div class="mb-16">
+      <h3 class="text-2xl font-bold text-center mb-8 text-ink-900">Los 5 factores</h3>
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        {factorOrder.map((f, i) => {
+          const info = FACTOR_DETALLES[f];
+          return (
+            <div
+              class:list={["relative rounded-2xl p-5 bg-gradient-to-br from-surface-elevated to-surface border border-border hover:border-brand-300 hover:shadow-md transition-all", `animate-fade-up delay-${i * 100}`]}
+              data-reveal
+            >
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-2xl" aria-hidden="true">{factorIcons[f]}</span>
+                <span class="text-2xl font-black text-gradient">{info.peso_pct}%</span>
+              </div>
+              <h4 class="font-bold text-sm mb-1 text-ink-900">{info.nombre}</h4>
+              <p class="text-xs text-ink-600 leading-relaxed">{info.proposito.split(".")[0]}.</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+    {/* Worked example */}
+    <div class="mb-16" data-reveal>
+      <div class="rounded-3xl bg-gradient-to-br from-ink-950 via-ink-900 to-ink-950 text-ink-50 p-8 sm:p-10 lg:p-12 shadow-2xl overflow-hidden relative">
+        <div class="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-brand-600/10 blur-3xl" aria-hidden="true"></div>
+        <div class="absolute -bottom-40 -left-40 w-72 h-72 rounded-full bg-accent-500/10 blur-3xl" aria-hidden="true"></div>
+
+        <div class="relative">
+          <div class="flex items-center justify-between mb-2">
+            <span class="inline-flex items-center gap-2 text-xs font-bold text-brand-400 uppercase tracking-wider">
+              <span class="w-2 h-2 rounded-full bg-accent-400 animate-pulse-soft"></span>
+              Trace en vivo
+            </span>
+            <span class="text-xs text-ink-400">Trace ID: <code class="text-ink-300">{primaryTrace.id}</code></span>
+          </div>
+
+          <h3 class="text-2xl sm:text-3xl font-black mt-4 mb-2 leading-tight">{primaryTrace.titulo}</h3>
+
+          {/* INPUT */}
+          <div class="mt-6 mb-8 p-5 rounded-2xl bg-ink-800/50 border border-ink-700 backdrop-blur-sm">
+            <div class="text-xs font-bold text-brand-400 uppercase tracking-wider mb-3">INPUT</div>
+            <div class="grid sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                <div class="text-ink-400 text-xs">Usuario</div>
+                <div class="font-medium">📍 {primaryTrace.contexto_usuario.ubicacion}, Huila · {primaryTrace.contexto_usuario.hora_local}</div>
+              </div>
+              <div>
+                <div class="text-ink-400 text-xs">Query</div>
+                <div class="font-medium">"{primaryTrace.contexto_usuario.query}"</div>
+              </div>
+              {primaryTrace.contexto_usuario.preferencias && (
+                <div class="sm:col-span-2">
+                  <div class="text-ink-400 text-xs">Preferencias</div>
+                  <div class="flex flex-wrap gap-2 mt-1">
+                    {primaryTrace.contexto_usuario.preferencias.solo_verificados && (
+                      <Badge variant="success" size="xs">Solo verificados</Badge>
+                    )}
+                    {primaryTrace.contexto_usuario.preferencias.prefiere_acepta_saldo && (
+                      <Badge variant="accent" size="xs">Prefiere Saldo</Badge>
+                    )}
+                    {primaryTrace.contexto_usuario.preferencias.radio_km && (
+                      <Badge variant="brand" size="xs">Radio {primaryTrace.contexto_usuario.preferencias.radio_km} km</Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div>
+                <div class="text-ink-400 text-xs">Candidatos evaluados</div>
+                <div class="font-medium">{primaryTrace.candidatos_evaluados} negocios · {primaryTrace.descartados_por_radio} descartados por radio</div>
+              </div>
+            </div>
+          </div>
+
+          {/* RANKING */}
+          <div class="space-y-4">
+            {primaryTrace.ranking.map((item, i) => (
+              <div class="relative rounded-2xl bg-ink-800/70 border border-ink-700 backdrop-blur-sm p-6" data-reveal>
+                <div class="flex items-start gap-5">
+                  {/* Rank + Score */}
+                  <div class="flex-shrink-0 flex flex-col items-center">
+                    <div class:list={["w-12 h-12 rounded-full flex items-center justify-center font-black text-xl", item.rank === 1 ? "bg-gradient-to-br from-brand-500 to-accent-500 text-white shadow-lg shadow-brand-500/30" : "bg-ink-700 text-ink-300"]}>
+                      {item.rank}
+                    </div>
+                    <div class="mt-2 text-3xl font-black tabular-nums" class:list={[item.rank === 1 ? "text-gradient-warm" : "text-ink-400"]}>{item.score_total}</div>
+                    <div class="text-[0.625rem] text-ink-500 uppercase tracking-wider">/ 100</div>
+                  </div>
+
+                  {/* Business + breakdown */}
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
+                      <div>
+                        <h4 class="text-lg font-bold leading-tight">{item.negocio.nombre}</h4>
+                        <p class="text-xs text-ink-400 mt-0.5">{item.negocio.tagline} · {item.negocio.ciudad} · {item.distancia_km} km</p>
+                      </div>
+                      <div class="flex flex-wrap gap-1">
+                        {item.badges.map((b) => (
+                          <span class="inline-block text-[0.625rem] font-semibold px-1.5 py-0.5 rounded-full bg-ink-700/80 text-ink-200">{b}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Factor bars */}
+                    <div class="space-y-2 mb-3">
+                      {item.factores.map((f) => (
+                        <div>
+                          <div class="flex items-center justify-between text-xs mb-1">
+                            <span class="text-ink-300 inline-flex items-center gap-1.5">
+                              <span aria-hidden="true">{factorIcons[f.factor]}</span>
+                              <span>{FACTOR_DETALLES[f.factor].nombre}</span>
+                            </span>
+                            <span class="text-ink-400 tabular-nums">
+                              <span class="font-bold text-ink-100">{f.contribucion}</span>
+                              <span class="text-ink-500"> / {f.peso_pct}</span>
+                            </span>
+                          </div>
+                          <div class="h-1.5 bg-ink-700/50 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-700" class:list={[f.score >= 80 ? "bg-gradient-to-r from-accent-500 to-accent-400" : f.score >= 50 ? "bg-gradient-to-r from-brand-500 to-brand-400" : "bg-ink-500"]} style={`width: ${f.score}%`}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Reason */}
+                    <p class="text-xs text-ink-400 italic leading-relaxed border-l-2 border-ink-700 pl-3">
+                      {item.razon_recomendacion}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Why not this one */}
+          {primaryTrace.por_que_no_este.length > 0 && (
+            <div class="mt-6 p-5 rounded-2xl bg-ink-900/50 border border-ink-700">
+              <div class="text-xs font-bold text-warning uppercase tracking-wider mb-3">⚠️ Por qué no este</div>
+              {primaryTrace.por_que_no_este.map((p) => (
+                <div class="text-sm text-ink-300 leading-relaxed">
+                  <strong class="text-ink-100">{p.nombre}</strong> · {p.razon}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Competitive insight */}
+          <div class="mt-6 p-5 rounded-2xl bg-gradient-to-br from-brand-900/30 to-accent-900/20 border border-brand-700/50">
+            <div class="text-xs font-bold text-accent-400 uppercase tracking-wider mb-2">💡 Insight competitivo</div>
+            <p class="text-sm text-ink-200 leading-relaxed">{primaryTrace.insight_competitivo}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Factor explanations deep-dive */}
+    <div class="grid md:grid-cols-2 gap-4 lg:gap-5">
+      {factorOrder.map((f, i) => {
+        const info = FACTOR_DETALLES[f];
+        return (
+          <Card tone="default" class={`animate-fade-up delay-${i * 100}`} data-reveal>
+            <div class="flex items-baseline gap-3 mb-3">
+              <span class="text-2xl" aria-hidden="true">{factorIcons[f]}</span>
+              <h4 class="font-bold text-lg text-ink-900">{info.nombre}</h4>
+              <span class="ml-auto text-2xl font-black text-gradient">{info.peso_pct}%</span>
+            </div>
+            <p class="text-sm text-ink-600 leading-relaxed mb-4">{info.proposito}</p>
+            <div class="grid sm:grid-cols-2 gap-3 text-xs">
+              <div class="rounded-lg bg-accent-50 border border-accent-200 p-3">
+                <div class="font-bold text-accent-700 mb-1">↑ Sube cuando</div>
+                <p class="text-ink-700 leading-relaxed">{info.cuando_sube}</p>
+              </div>
+              <div class="rounded-lg bg-[oklch(0.95_0.04_25)] border border-[oklch(0.90_0.10_25)] p-3">
+                <div class="font-bold text-[oklch(0.40_0.15_25)] mb-1">↓ Baja cuando</div>
+                <p class="text-ink-700 leading-relaxed">{info.cuando_baja}</p>
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+
+    {/* Other scenarios */}
+    <div class="mt-16">
+      <h3 class="text-xl font-bold text-center mb-6 text-ink-900">Más ejemplos (5 escenarios)</h3>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        {TRACES_DETALLADOS.map((t, i) => (
+          <a href={`#trace-${t.id}`} class="block rounded-xl bg-surface-elevated border border-border p-4 hover:border-brand-300 hover:shadow-md transition-all text-center" data-reveal>
+            <div class="text-xs text-brand-700 font-bold uppercase tracking-wider mb-1">Escenario {String(i + 1).padStart(2, "0")}</div>
+            <div class="text-sm font-bold text-ink-900 leading-tight">{t.contexto_usuario.ubicacion}</div>
+            <div class="text-xs text-ink-500 mt-1">"{t.contexto_usuario.query}"</div>
+            <div class="mt-2 text-xs text-accent-700 font-semibold">{t.ranking[0]?.score_total}/100 gana</div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

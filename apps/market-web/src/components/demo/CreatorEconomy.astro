@@ -1,0 +1,241 @@
+---
+/**
+ * CreatorEconomy — section explaining the creator side of Opita Market.
+ *
+ * Shows: how creators join, how they monetize, sample creator profiles with stats.
+ * The "B2K" (business-to-creator) layer of the three-sided marketplace.
+ *
+ * Usage:
+ *   <CreatorEconomy />
+ */
+import Badge from "./Badge.astro";
+import BgPattern from "./BgPattern.astro";
+import Card from "./Card.astro";
+
+interface CreatorProfile {
+  name: string;
+  handle: string;
+  avatar?: string;
+  initials: string;
+  city: string;
+  followers: number;
+  videos_published: number;
+  total_views: number;
+  attributed_sales_cop: number;
+  commission_earned_cop: number;
+  niche: string;
+  accent: "brand" | "accent" | "sky";
+}
+
+const formatCount = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString("es-CO");
+};
+
+const formatCOP = (v: number) =>
+  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
+    .format(v)
+    .replace(/\u00A0/g, " ");
+
+const creators: CreatorProfile[] = [
+  {
+    name: "María Restrepo",
+    handle: "@lacocineraopita",
+    initials: "MR",
+    city: "Neiva",
+    followers: 12_400,
+    videos_published: 47,
+    total_views: 1_200_000,
+    attributed_sales_cop: 8_400_000,
+    commission_earned_cop: 420_000,
+    niche: "Restaurantes · Lechona · Asados",
+    accent: "brand",
+  },
+  {
+    name: "Camilo Ortega",
+    handle: "@barberodelpueblo",
+    initials: "CO",
+    city: "Pitalito",
+    followers: 8_700,
+    videos_published: 62,
+    total_views: 760_000,
+    attributed_sales_cop: 4_200_000,
+    commission_earned_cop: 210_000,
+    niche: "Barberías · Estilo caballero",
+    accent: "sky",
+  },
+  {
+    name: "Diana Castillo",
+    handle: "@unasdehuila",
+    initials: "DC",
+    city: "Neiva",
+    followers: 23_100,
+    videos_published: 89,
+    total_views: 3_100_000,
+    attributed_sales_cop: 18_700_000,
+    commission_earned_cop: 935_000,
+    niche: "Belleza · Uñas · Skincare",
+    accent: "accent",
+  },
+];
+
+const monetizationStreams = [
+  {
+    icon: "💰",
+    title: "Comisión por venta atribuida",
+    description: "5% del valor de cada venta generada por tu video (tracked por código único)",
+    example: "Tu video de lechona generó 47 ventas este mes = $420.000 para ti",
+    color: "brand",
+  },
+  {
+    icon: "📺",
+    title: "Pool de views (futuro)",
+    description: "Cuando un video tuyo supera 10K views, participas en el pool mensual de views",
+    example: "Proyección 2026: pool inicial de $50M COP/mes para 1000 creadores top",
+    color: "accent",
+  },
+  {
+    icon: "🤝",
+    title: "Brand deals",
+    description: "Negocios te contactan para colaboraciones pagadas después de que tu video se viraliza",
+    example: "Asadero El Tamayo te paga $500K por 1 video patrocinado de 30s",
+    color: "sky",
+  },
+  {
+    icon: "🎁",
+    title: "OpiCoins bonus",
+    description: "Por cada video que supera 1000 views, recibes 500 OpiCoins canjeables",
+    example: "47 videos virales este mes = 23,500 OpiCoins extra",
+    color: "warning",
+  },
+];
+---
+
+<section class="relative bg-mesh-warm py-20 sm:py-28" data-reveal>
+  <BgPattern pattern="lines" tone="warm" opacity={0.25} />
+
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 max-w-3xl mx-auto">
+      <Badge variant="brand">Capítulo 06 · Creadores</Badge>
+      <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+        La tercera pata. <span class="text-gradient-warm">Creadores que monetizan.</span>
+      </h2>
+      <p class="text-lg sm:text-xl text-ink-600 leading-relaxed text-pretty">
+        Cualquiera con celular y carisma puede ser creador en Opita Market. Filma un plato, una manicura, un corte. Si la gente compra, ganas. <strong>Sin managers, sin agencias, sin permisos especiales.</strong>
+      </p>
+    </div>
+
+    {/* 4 monetization streams */}
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-16">
+      {monetizationStreams.map((s, i) => (
+        <Card tone="default" class={`animate-fade-up delay-${i * 100}`} data-reveal>
+          <div class="text-3xl mb-3">{s.icon}</div>
+          <h3 class="font-bold text-base text-ink-900 mb-2">{s.title}</h3>
+          <p class="text-sm text-ink-600 leading-relaxed mb-3">{s.description}</p>
+          <div class="px-3 py-2 rounded-lg bg-accent-50 border border-accent-200 text-xs text-accent-800 font-mono">
+            <span class="text-accent-500">→</span> {s.example}
+          </div>
+        </Card>
+      ))}
+    </div>
+
+    {/* Sample creator profiles */}
+    <div class="mb-12">
+      <div class="flex items-end justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h3 class="text-2xl font-bold text-ink-900 mb-1">Creadores reales del piloto</h3>
+          <p class="text-sm text-ink-600">Datos sintéticos pero las mecánicas son reales — comisión tracked por código único.</p>
+        </div>
+        <Badge variant="success" size="sm">3 ejemplos</Badge>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-5">
+        {creators.map((c, i) => (
+          <Card tone="default" class={`animate-fade-up delay-${i * 100}`} data-reveal>
+            <div class="flex items-start gap-3 mb-4">
+              <div class:list={["w-14 h-14 rounded-full bg-gradient-to-br flex items-center justify-center font-black text-lg text-white ring-2 ring-white shadow-md", c.accent === "brand" ? "from-brand-500 to-brand-700" : c.accent === "accent" ? "from-accent-500 to-accent-700" : "from-sky-500 to-sky-700"]}>
+                {c.initials}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-ink-900">{c.name}</div>
+                <div class="text-sm text-brand-700 font-medium">{c.handle}</div>
+                <div class="text-xs text-ink-500">📍 {c.city} · {c.niche}</div>
+              </div>
+              <Badge variant="success" size="xs">Verificado</Badge>
+            </div>
+
+            {/* Stats grid */}
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <div class="rounded-lg bg-surface p-3">
+                <div class="text-xs text-ink-500">Seguidores</div>
+                <div class="text-lg font-black text-ink-900 tabular-nums">{formatCount(c.followers)}</div>
+              </div>
+              <div class="rounded-lg bg-surface p-3">
+                <div class="text-xs text-ink-500">Videos</div>
+                <div class="text-lg font-black text-ink-900 tabular-nums">{c.videos_published}</div>
+              </div>
+              <div class="rounded-lg bg-surface p-3">
+                <div class="text-xs text-ink-500">Views totales</div>
+                <div class="text-lg font-black text-ink-900 tabular-nums">{formatCount(c.total_views)}</div>
+              </div>
+              <div class="rounded-lg bg-surface p-3">
+                <div class="text-xs text-ink-500">Ventas atribuidas</div>
+                <div class="text-lg font-black text-brand-700 tabular-nums">{formatCOP(c.attributed_sales_cop)}</div>
+              </div>
+            </div>
+
+            {/* Commission earned */}
+            <div class="mt-3 rounded-lg bg-gradient-to-br from-accent-50 to-brand-50 border border-accent-200 p-3">
+              <div class="flex items-baseline justify-between">
+                <span class="text-xs font-semibold text-accent-700">Comisión ganada (mes)</span>
+                <span class="text-base font-black text-accent-800 tabular-nums">{formatCOP(c.commission_earned_cop)}</span>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+
+    {/* Onboarding flow */}
+    <div class="rounded-3xl bg-gradient-to-br from-ink-950 to-ink-900 text-ink-50 p-8 sm:p-10 lg:p-12 shadow-2xl relative overflow-hidden">
+      <div class="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-brand-600/10 blur-3xl"></div>
+      <div class="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-accent-500/10 blur-3xl"></div>
+
+      <div class="relative">
+        <Badge variant="brand">Cómo te haces creador</Badge>
+        <h3 class="text-2xl sm:text-3xl font-black mt-4 mb-8">De "ver un plato bueno" a "ganar $400K al mes" en 4 pasos</h3>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="rounded-2xl bg-ink-800/50 border border-ink-700 p-5 backdrop-blur-sm">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center font-black text-sm text-white mb-3">1</div>
+            <h4 class="font-bold mb-1.5">Descargas la app</h4>
+            <p class="text-xs text-ink-300 leading-relaxed">Creas cuenta con tu número. Eliges "Soy creador". Sin papeleo.</p>
+          </div>
+          <div class="rounded-2xl bg-ink-800/50 border border-ink-700 p-5 backdrop-blur-sm">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-accent-500 to-accent-700 flex items-center justify-center font-black text-sm text-white mb-3">2</div>
+            <h4 class="font-bold mb-1.5">Filmas tu primer video</h4>
+            <p class="text-xs text-ink-300 leading-relaxed">15-60 segundos. Eliges el negocio local y filmas su plato o servicio.</p>
+          </div>
+          <div class="rounded-2xl bg-ink-800/50 border border-ink-700 p-5 backdrop-blur-sm">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center font-black text-sm text-white mb-3">3</div>
+            <h4 class="font-bold mb-1.5">El algoritmo lo muestra</h4>
+            <p class="text-xs text-ink-300 leading-relaxed">A los usuarios a los que les interesa tu nicho. Empieza con 100 views, escala a 100K.</p>
+          </div>
+          <div class="rounded-2xl bg-ink-800/50 border border-ink-700 p-5 backdrop-blur-sm">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-accent-500 to-warning flex items-center justify-center font-black text-sm text-white mb-3">4</div>
+            <h4 class="font-bold mb-1.5">Cobras comisión</h4>
+            <p class="text-xs text-ink-300 leading-relaxed">Cada venta atribuida a tu video = 5% para ti. Retiro semanal a Nequi/Bre-B/Opita Saldo.</p>
+          </div>
+        </div>
+
+        <div class="mt-8 p-5 rounded-2xl bg-gradient-to-br from-brand-900/30 to-accent-900/20 border border-brand-700/50">
+          <div class="text-xs font-bold text-accent-400 uppercase tracking-wider mb-2">💡 El detalle clave</div>
+          <p class="text-sm text-ink-200 leading-relaxed">
+            No necesitas seguidores para empezar a ganar. El algoritmo da visibilidad a videos nuevos basado en engagement (watch time, likes, shares), no en follower count. Un creador con 200 seguidores puede tener un video con 50K views si la gente lo ve completo. <strong>Esto democratiza el creator economy — no es TikTok donde necesitas ser influencer para vivir.</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

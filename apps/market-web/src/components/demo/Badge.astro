@@ -1,0 +1,45 @@
+---
+/**
+ * Badge — small inline pill for status / category / metadata.
+ *
+ * Usage:
+ *   <Badge>Verificado</Badge>
+ *   <Badge variant="accent">Acepta Saldo</Badge>
+ *   <Badge variant="success" size="sm">Fresco</Badge>
+ */
+interface Props {
+  variant?: "default" | "brand" | "accent" | "sky" | "success" | "warning" | "danger" | "outline";
+  size?: "xs" | "sm" | "md";
+  class?: string;
+}
+
+const { variant = "default", size = "sm", class: className = "" } = Astro.props;
+
+const variantMap: Record<NonNullable<Props["variant"]>, string> = {
+  default: "bg-ink-100 text-ink-700 border border-ink-200",
+  brand: "bg-brand-100 text-brand-800 border border-brand-200",
+  accent: "bg-accent-100 text-accent-800 border border-accent-200",
+  sky: "bg-sky-100 text-sky-800 border border-sky-200",
+  success: "bg-accent-100 text-accent-800 border border-accent-300",
+  warning: "bg-[oklch(0.93_0.05_65)] text-[oklch(0.35_0.10_50)] border border-[oklch(0.85_0.10_65)]",
+  danger: "bg-[oklch(0.93_0.05_25)] text-[oklch(0.40_0.15_25)] border border-[oklch(0.85_0.12_25)]",
+  outline: "bg-transparent text-ink-700 border border-ink-300",
+};
+
+const sizeMap: Record<NonNullable<Props["size"]>, string> = {
+  xs: "text-[0.6875rem] px-1.5 py-0.5",
+  sm: "text-xs px-2 py-0.5",
+  md: "text-sm px-2.5 py-1",
+};
+---
+
+<span
+  class:list={[
+    "inline-flex items-center gap-1 rounded-full font-medium whitespace-nowrap",
+    variantMap[variant],
+    sizeMap[size],
+    className,
+  ]}
+>
+  <slot />
+</span>

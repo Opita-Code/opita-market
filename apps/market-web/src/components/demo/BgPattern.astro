@@ -1,0 +1,145 @@
+---
+/**
+ * BgPattern — decorative SVG background patterns.
+ * No external assets, all inline. Pair with section backgrounds.
+ *
+ * Usage:
+ *   <BgPattern pattern="dots" />
+ *   <BgPattern pattern="grid" tone="dark" />
+ *   <BgPattern pattern="andean" tone="warm" />
+ */
+interface Props {
+  pattern: "dots" | "grid" | "lines" | "andean" | "coffee" | "blobs";
+  tone?: "light" | "warm" | "cool" | "dark";
+  opacity?: number;
+  class?: string;
+}
+
+const { pattern, tone = "light", opacity = 0.5, class: className = "" } = Astro.props;
+
+// Color tokens per tone
+const toneColor: Record<NonNullable<Props["tone"]>, string> = {
+  light: "oklch(0.40 0.012 60 / 0.10)",
+  warm: "oklch(0.48 0.130 35 / 0.12)",
+  cool: "oklch(0.40 0.115 230 / 0.12)",
+  dark: "oklch(1 0 0 / 0.10)",
+};
+
+const stroke = toneColor[tone];
+---
+
+{pattern === "dots" && (
+  <svg
+    class:list={["absolute inset-0 w-full h-full pointer-events-none", className]}
+    style={`opacity: ${opacity}`}
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <defs>
+      <pattern id="bgpattern-dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+        <circle cx="2" cy="2" r="1.2" fill={stroke} />
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#bgpattern-dots)" />
+  </svg>
+)}
+
+{pattern === "grid" && (
+  <svg
+    class:list={["absolute inset-0 w-full h-full pointer-events-none", className]}
+    style={`opacity: ${opacity}`}
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <defs>
+      <pattern id="bgpattern-grid" x="0" y="0" width="64" height="64" patternUnits="userSpaceOnUse">
+        <path d="M 64 0 L 0 0 0 64" fill="none" stroke={stroke} stroke-width="1" />
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#bgpattern-grid)" />
+  </svg>
+)}
+
+{pattern === "lines" && (
+  <svg
+    class:list={["absolute inset-0 w-full h-full pointer-events-none", className]}
+    style={`opacity: ${opacity}`}
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    preserveAspectRatio="none"
+  >
+    <defs>
+      <pattern id="bgpattern-lines" x="0" y="0" width="120" height="120" patternUnits="userSpaceOnUse">
+        <path d="M0 60 Q30 30, 60 60 T120 60" fill="none" stroke={stroke} stroke-width="1.5" />
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#bgpattern-lines)" />
+  </svg>
+)}
+
+{pattern === "andean" && (
+  <svg
+    class:list={["absolute inset-0 w-full h-full pointer-events-none", className]}
+    style={`opacity: ${opacity}`}
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    preserveAspectRatio="xMidYMid slice"
+    viewBox="0 0 1200 600"
+  >
+    <defs>
+      <pattern id="bgpattern-andean" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+        <g stroke={stroke} stroke-width="1" fill="none">
+          <path d="M0 30 L15 15 L30 30 L15 45 Z" />
+          <path d="M30 30 L45 15 L60 30 L45 45 Z" />
+        </g>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#bgpattern-andean)" />
+  </svg>
+)}
+
+{pattern === "coffee" && (
+  <svg
+    class:list={["absolute inset-0 w-full h-full pointer-events-none", className]}
+    style={`opacity: ${opacity}`}
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    preserveAspectRatio="xMidYMax slice"
+    viewBox="0 0 1200 400"
+  >
+    {/* Coffee branch silhouette, very subtle */}
+    <g stroke={stroke} stroke-width="1" fill="none" opacity="0.6">
+      <path d="M0 380 Q300 320, 600 360 T1200 340" />
+      <ellipse cx="200" cy="340" rx="22" ry="14" />
+      <ellipse cx="380" cy="330" rx="22" ry="14" />
+      <ellipse cx="560" cy="345" rx="22" ry="14" />
+      <ellipse cx="740" cy="325" rx="22" ry="14" />
+      <ellipse cx="920" cy="335" rx="22" ry="14" />
+      <path d="M200 340 Q210 320, 220 300" />
+      <path d="M380 330 Q390 310, 400 290" />
+      <path d="M560 345 Q570 325, 580 305" />
+    </g>
+  </svg>
+)}
+
+{pattern === "blobs" && (
+  <svg
+    class:list={["absolute inset-0 w-full h-full pointer-events-none", className]}
+    style={`opacity: ${opacity}`}
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    preserveAspectRatio="none"
+    viewBox="0 0 1200 800"
+  >
+    <defs>
+      <filter id="bgpattern-blob-blur">
+        <feGaussianBlur stdDeviation="40" />
+      </filter>
+    </defs>
+    <g filter="url(#bgpattern-blob-blur)" fill={stroke}>
+      <circle cx="200" cy="200" r="120" />
+      <circle cx="900" cy="400" r="140" />
+      <circle cx="400" cy="700" r="100" />
+    </g>
+  </svg>
+)}

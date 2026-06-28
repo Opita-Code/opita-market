@@ -1,0 +1,101 @@
+---
+/**
+ * JourneySteps — visual step-by-step for B2C and B2B user journeys.
+ *
+ * Usage:
+ *   <JourneySteps
+ *     title="Para ti (consumidor)"
+ *     audience="b2c"
+ *     color="brand"
+ *     steps={[
+ *       { icon: "🔍", title: "Buscas", description: "..." },
+ *       { icon: "📱", title: "Contactas", description: "..." },
+ *     ]}
+ *   />
+ */
+
+interface Step {
+  icon: string;
+  title: string;
+  description: string;
+  artifact?: string; // What the user sees at this step (e.g., screenshot of UI)
+}
+
+interface Props {
+  title: string;
+  audience: "b2c" | "b2b";
+  steps: Step[];
+  color?: "brand" | "accent" | "sky";
+  class?: string;
+}
+
+const { title, audience, steps, color = "brand", class: className = "" } = Astro.props;
+
+const gradientByColor: Record<NonNullable<Props["color"]>, string> = {
+  brand: "from-brand-50 to-brand-100/40 border-brand-200",
+  accent: "from-accent-50 to-accent-100/40 border-accent-200",
+  sky: "from-sky-50 to-sky-100/40 border-sky-200",
+};
+
+const iconBgByColor: Record<NonNullable<Props["color"]>, string> = {
+  brand: "bg-brand-500 text-white shadow-lg shadow-brand-500/20",
+  accent: "bg-accent-500 text-white shadow-lg shadow-accent-500/20",
+  sky: "bg-sky-500 text-white shadow-lg shadow-sky-500/20",
+};
+
+const accentTextByColor: Record<NonNullable<Props["color"]>, string> = {
+  brand: "text-brand-700",
+  accent: "text-accent-700",
+  sky: "text-sky-700",
+};
+
+const badgeVariantByColor: Record<NonNullable<Props["color"]>, "brand" | "accent" | "sky"> = {
+  brand: "brand",
+  accent: "accent",
+  sky: "sky",
+};
+---
+
+<div class:list={["rounded-3xl bg-gradient-to-br border-2 p-6 sm:p-8 lg:p-10", gradientByColor[color], className]} data-reveal>
+  <div class="flex items-center gap-3 mb-6">
+    <span class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider" class:list={[accentTextByColor[color]]}>
+      {audience === "b2c" ? "B2C · Consumidor" : "B2B · Negocio"}
+    </span>
+    <span class="text-2xl">{audience === "b2c" ? "🛒" : "🏪"}</span>
+  </div>
+  <h3 class="text-2xl sm:text-3xl font-black mb-2 leading-tight">{title}</h3>
+  <p class="text-sm text-ink-600 mb-8 leading-relaxed max-w-2xl">
+    {audience === "b2c"
+      ? "Lo que un consumidor en el Huila experimenta, desde la búsqueda hasta el pago y la reseña."
+      : "Lo que un comerciante del Huila vive, desde reclamar su perfil hasta recibir pagos y crecer."}
+  </p>
+
+  {/* Steps */}
+  <ol class="relative">
+    {/* Connecting line */}
+    <div class="absolute left-5 top-5 bottom-5 w-0.5 bg-gradient-to-b from-current to-transparent opacity-20" aria-hidden="true"></div>
+
+    {steps.map((step, i) => (
+      <li class="relative pl-14 pb-6 last:pb-0 animate-fade-up" style={`animation-delay: ${i * 80}ms`}>
+        {/* Step number */}
+        <div class:list={["absolute left-0 top-0 w-10 h-10 rounded-full flex items-center justify-center font-black text-sm", iconBgByColor[color]]}>
+          {i + 1}
+        </div>
+
+        {/* Content */}
+        <div class="bg-surface-elevated rounded-2xl p-5 border border-border shadow-sm">
+          <div class="flex items-baseline gap-3 mb-1.5">
+            <span class="text-2xl" aria-hidden="true">{step.icon}</span>
+            <h4 class="font-bold text-lg text-ink-900">{step.title}</h4>
+          </div>
+          <p class="text-sm text-ink-600 leading-relaxed">{step.description}</p>
+          {step.artifact && (
+            <div class="mt-3 px-3 py-2 rounded-lg bg-ink-50 border border-ink-200 text-xs font-mono text-ink-600">
+              <span class="text-ink-400">→</span> {step.artifact}
+            </div>
+          )}
+        </div>
+      </li>
+    ))}
+  </ol>
+</div>

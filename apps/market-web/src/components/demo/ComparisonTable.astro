@@ -1,0 +1,86 @@
+---
+/**
+ * ComparisonTable — Opita Market vs alternatives.
+ *
+ * Usage:
+ *   <ComparisonTable rows={[
+ *     { feature: "Verificación NIT", opita: "✓", tradicional: "—", mercadolibre: "—" },
+ *     ...
+ *   ]} />
+ */
+interface Row {
+  feature: string;
+  opita: string | boolean;
+  tradicional: string | boolean;
+  mercadolibre?: string | boolean;
+  paginasamarillas?: string | boolean;
+}
+
+interface Props {
+  rows: Row[];
+  caption?: string;
+  tone?: "light" | "dark";
+  class?: string;
+}
+
+const { rows, caption, tone = "light", class: className = "" } = Astro.props;
+
+const renderCell = (value: string | boolean) => {
+  if (typeof value === "boolean") {
+    return value ? "✓" : "—";
+  }
+  return value;
+};
+
+const cellPositive = "text-accent-700";
+const cellNegative = "text-ink-400";
+const cellNeutral = "text-ink-700";
+---
+
+<div class:list={["overflow-x-auto rounded-2xl border", tone === "light" ? "border-border bg-surface-elevated" : "border-ink-700 bg-ink-900", className]}>
+  <table class="w-full text-sm">
+    <thead>
+      <tr class:list={["border-b", tone === "light" ? "border-border" : "border-ink-700"]}>
+        <th class:list={["py-4 px-4 text-left font-semibold", tone === "light" ? "text-ink-700" : "text-ink-200"]}>Característica</th>
+        <th class:list={["py-4 px-4 text-center font-bold text-gradient"]}>Opita Market</th>
+        <th class:list={["py-4 px-4 text-center font-semibold", tone === "light" ? "text-ink-700" : "text-ink-200"]}>Status quo</th>
+        {rows[0]?.mercadolibre !== undefined && (
+          <th class:list={["py-4 px-4 text-center font-semibold", tone === "light" ? "text-ink-700" : "text-ink-200"]}>MercadoLibre</th>
+        )}
+        {rows[0]?.paginasamarillas !== undefined && (
+          <th class:list={["py-4 px-4 text-center font-semibold", tone === "light" ? "text-ink-700" : "text-ink-200"]}>Páginas Amarillas</th>
+        )}
+      </tr>
+    </thead>
+    <tbody>
+      {rows.map((row, i) => (
+        <tr class:list={[i % 2 === 0 && (tone === "light" ? "bg-surface/50" : "bg-ink-800/30"), "border-b last:border-0", tone === "light" ? "border-border" : "border-ink-700"]}>
+          <td class:list={["py-3 px-4 font-medium", tone === "light" ? "text-ink-800" : "text-ink-200"]}>
+            {row.feature}
+          </td>
+          <td class:list={["py-3 px-4 text-center font-bold", row.opita === true || row.opita === "✓" ? cellPositive : cellNegative]}>
+            {renderCell(row.opita)}
+          </td>
+          <td class:list={["py-3 px-4 text-center", row.tradicional === true || row.tradicional === "✓" ? cellPositive : cellNeutral]}>
+            {renderCell(row.tradicional)}
+          </td>
+          {row.mercadolibre !== undefined && (
+            <td class:list={["py-3 px-4 text-center", row.mercadolibre === true || row.mercadolibre === "✓" ? cellPositive : cellNeutral]}>
+              {renderCell(row.mercadolibre)}
+            </td>
+          )}
+          {row.paginasamarillas !== undefined && (
+            <td class:list={["py-3 px-4 text-center", row.paginasamarillas === true || row.paginasamarillas === "✓" ? cellPositive : cellNeutral]}>
+              {renderCell(row.paginasamarillas)}
+            </td>
+          )}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  {caption && (
+    <p class:list={["text-xs px-4 py-3", tone === "light" ? "text-ink-500" : "text-ink-400"]}>
+      {caption}
+    </p>
+  )}
+</div>

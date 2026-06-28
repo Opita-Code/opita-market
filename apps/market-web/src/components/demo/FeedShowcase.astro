@@ -1,0 +1,197 @@
+---
+/**
+ * FeedShowcase — the TikTok-style product feed for the social commerce layer.
+ *
+ * Shows: scrollable feed of product videos with creator info, business overlay,
+ * action buttons. Includes personalization examples ("Why am I seeing this?").
+ *
+ * Usage:
+ *   <FeedShowcase />
+ */
+import Badge from "./Badge.astro";
+import BgPattern from "./BgPattern.astro";
+import FeedCard from "./FeedCard.astro";
+import Section from "./Section.astro";
+
+// Sample feed items (mix of verticals + algorithm reasons)
+const feedItems = [
+  {
+    videoSrc: "/demo/verticals/foods.png",
+    creatorName: "@lacocineraopita",
+    creatorInitials: "LO",
+    creatorFollowers: 12400,
+    productName: "Lechona por libra",
+    productPrice: 38000,
+    productUnit: "libra",
+    businessName: "Asadero El Tamayo",
+    businessTier: "premium" as const,
+    businessVerified: true,
+    acceptsSaldo: true,
+    duration: 23,
+    likes: 1247,
+    comments: 89,
+    saves: 156,
+    algorithmReason: "Porque te gustan los asados en Neiva",
+  },
+  {
+    videoSrc: "/demo/verticals/beauty.png",
+    creatorName: "@unasdehuila",
+    creatorInitials: "UH",
+    creatorFollowers: 23100,
+    productName: "Manicura gel premium",
+    productPrice: 45000,
+    productUnit: "sesión",
+    businessName: "María Estética Integral",
+    businessTier: "premium" as const,
+    businessVerified: true,
+    acceptsSaldo: true,
+    duration: 47,
+    likes: 3421,
+    comments: 234,
+    saves: 567,
+    algorithmReason: "Visto 3 salones cerca · ranking Beauty",
+  },
+  {
+    videoSrc: "/demo/verticals/barber.png",
+    creatorName: "@barberodelpueblo",
+    creatorInitials: "BP",
+    creatorFollowers: 8700,
+    productName: "Combo corte + barba",
+    productPrice: 28000,
+    productUnit: "servicio",
+    businessName: "Barbería El Poblado",
+    businessTier: "premium" as const,
+    businessVerified: true,
+    acceptsSaldo: true,
+    duration: 18,
+    likes: 892,
+    comments: 47,
+    saves: 89,
+    algorithmReason: "Estás en Neiva · barberías verificadas",
+  },
+  {
+    videoSrc: "/demo/verticals/hogar.png",
+    creatorName: "@don_repara",
+    creatorInitials: "DR",
+    creatorFollowers: 4200,
+    productName: "Visita + diagnóstico",
+    productPrice: 45000,
+    productUnit: "visita",
+    businessName: "Plomería Rivera Huila",
+    businessTier: "visible" as const,
+    businessVerified: true,
+    acceptsSaldo: true,
+    duration: 31,
+    likes: 234,
+    comments: 18,
+    saves: 42,
+    algorithmReason: "Video tendencia · servicios 24/7",
+  },
+  {
+    videoSrc: "/demo/verticals/foods.png",
+    creatorName: "@frutas_opita",
+    creatorInitials: "FO",
+    creatorFollowers: 6700,
+    productName: "Lulo fresco · kilo",
+    productPrice: 8500,
+    productUnit: "kilo",
+    businessName: "Frutas Doña Marta",
+    businessTier: "visible" as const,
+    businessVerified: true,
+    acceptsSaldo: true,
+    duration: 12,
+    likes: 567,
+    comments: 34,
+    saves: 78,
+    algorithmReason: "Precios actualizados hoy · Huila",
+  },
+  {
+    videoSrc: "/demo/verticals/beauty.png",
+    creatorName: "@sparelax_andino",
+    creatorInitials: "SA",
+    creatorFollowers: 3100,
+    productName: "Masaje relajante 60min",
+    productPrice: 85000,
+    productUnit: "sesión",
+    businessName: "Spa Relax Andino",
+    businessTier: "visible" as const,
+    businessVerified: true,
+    acceptsSaldo: false,
+    duration: 42,
+    likes: 189,
+    comments: 12,
+    saves: 28,
+    algorithmReason: "Tendencias de bienestar · esta semana",
+  },
+];
+---
+
+<section class="relative bg-ink-950 text-ink-50 py-20 sm:py-28 overflow-hidden" data-reveal>
+  {/* Background effects */}
+  <BgPattern pattern="grid" tone="dark" opacity={0.4} />
+  <div class="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-brand-600/10 blur-3xl"></div>
+  <div class="absolute bottom-1/4 -right-32 w-96 h-96 rounded-full bg-accent-500/10 blur-3xl"></div>
+
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 max-w-3xl mx-auto">
+      <Badge variant="brand">Capítulo 04 · El feed</Badge>
+      <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
+        De <span class="text-ink-500 line-through">Temu</span> a <span class="text-gradient-warm">TikTok-Temu</span>.
+      </h2>
+      <p class="text-lg sm:text-xl text-ink-300 leading-relaxed text-pretty">
+        Los productos ya no son fotos. Son <strong>videos de 30 segundos</strong> hechos por gente real, en el restaurante real, comiéndose el plato real. El algoritmo decide qué video le muestra a qué persona — y tú compras sin salir del video.
+      </p>
+    </div>
+
+    {/* The feed */}
+    <div class="relative -mx-4 sm:-mx-6 lg:mx-0">
+      <div class="flex gap-4 overflow-x-auto pb-4 px-4 sm:px-6 lg:px-0 snap-x snap-mandatory">
+        {feedItems.map((item, i) => (
+          <div class="flex-shrink-0 snap-start">
+            <FeedCard {...item} />
+          </div>
+        ))}
+      </div>
+      {/* Fade edges */}
+      <div class="hidden lg:block pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-ink-950 to-transparent"></div>
+      <div class="hidden lg:block pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-r from-transparent to-ink-950"></div>
+    </div>
+
+    {/* Personalization explanation */}
+    <div class="mt-16 grid md:grid-cols-2 gap-6">
+      <div class="rounded-2xl bg-ink-900/70 border border-ink-700 backdrop-blur-sm p-6" data-reveal>
+        <Badge variant="brand" size="sm">Personalización</Badge>
+        <h3 class="text-xl font-black mt-3 mb-2">¿Por qué este video y no otro?</h3>
+        <p class="text-sm text-ink-300 leading-relaxed mb-4">
+          El algoritmo del feed evalúa <strong>40+ señales en tiempo real</strong> para cada par (usuario, video):
+        </p>
+        <ul class="space-y-1.5 text-sm text-ink-200">
+          <li class="flex items-start gap-2"><span class="text-brand-400">→</span><span><strong>Geo</strong> (25%): distancia al negocio del video</span></li>
+          <li class="flex items-start gap-2"><span class="text-brand-400">→</span><span><strong>Watch-time predictivo</strong> (20%): basado en tus patrones</span></li>
+          <li class="flex items-start gap-2"><span class="text-brand-400">→</span><span><strong>Nicho affinity</strong> (15%): similitud con videos que completaste</span></li>
+          <li class="flex items-start gap-2"><span class="text-brand-400">→</span><span><strong>Creator affinity</strong> (15%): sigues o interactúas con este creador</span></li>
+          <li class="flex items-start gap-2"><span class="text-brand-400">→</span><span><strong>Diversity</strong> (15%): no mostrarte solo un tipo de negocio</span></li>
+          <li class="flex items-start gap-2"><span class="text-brand-400">→</span><span><strong>Recencia</strong> (10%): videos de las últimas 48h</span></li>
+        </ul>
+      </div>
+
+      <div class="rounded-2xl bg-gradient-to-br from-brand-900/30 to-accent-900/30 border border-brand-700/50 backdrop-blur-sm p-6" data-reveal>
+        <Badge variant="brand" size="sm">Transparencia</Badge>
+        <h3 class="text-xl font-black mt-3 mb-2">"¿Por qué me muestras esto?"</h3>
+        <p class="text-sm text-ink-200 leading-relaxed mb-4">
+          Cada video muestra la razón por la que te aparece. Sin cajas negras. Sin manipulación. Si no te gusta, lo dices y el algoritmo aprende.
+        </p>
+        <div class="space-y-2">
+          <div class="rounded-xl bg-ink-900/60 border border-ink-700 p-3">
+            <div class="text-xs text-brand-400 font-bold uppercase tracking-wider mb-1">Porque viste 3 videos de barberías en Neiva</div>
+            <div class="text-sm text-ink-200">Algoritmo cree que te interesa → muestra barber cerca → si ignoras, aprende</div>
+          </div>
+          <div class="rounded-xl bg-ink-900/60 border border-ink-700 p-3">
+            <div class="text-xs text-brand-400 font-bold uppercase tracking-wider mb-1">Tendencia esta semana en el Huila</div>
+            <div class="text-sm text-ink-200">Videos con +200% views en los últimos 7 días → boost para ti también</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
