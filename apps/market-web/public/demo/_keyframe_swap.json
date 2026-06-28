@@ -1,0 +1,34 @@
+{
+  "foods": {
+    "path": "C:\\Users\\nicou\\Documents\\IA\\opita-market\\apps\\market-web\\public\\demo\\verticals\\foods.png",
+    "size_bytes": 279736,
+    "format": "JPEG",
+    "width": 720,
+    "height": 1280,
+    "aspect": 0.5625
+  },
+  "barber": {
+    "path": "C:\\Users\\nicou\\Documents\\IA\\opita-market\\apps\\market-web\\public\\demo\\verticals\\barber.png",
+    "size_bytes": 265181,
+    "format": "JPEG",
+    "width": 720,
+    "height": 1280,
+    "aspect": 0.5625
+  },
+  "beauty": {
+    "path": "C:\\Users\\nicou\\Documents\\IA\\opita-market\\apps\\market-web\\public\\demo\\verticals\\beauty.png",
+    "size_bytes": 286751,
+    "format": "JPEG",
+    "width": 720,
+    "height": 1280,
+    "aspect": 0.5625
+  },
+  "hogar": {
+    "path": "C:\\Users\\nicou\\Documents\\IA\\opita-market\\apps\\market-web\\public\\demo\\verticals\\hogar.png",
+    "size_bytes": 301252,
+    "format": "JPEG",
+    "width": 720,
+    "height": 1280,
+    "aspect": 0.5625
+  }
+}
