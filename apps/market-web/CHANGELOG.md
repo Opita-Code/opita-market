@@ -11,6 +11,45 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [v0.1.0-demo-4] — 2026-06-28
+
+### Fixed
+- **`{{TELEFONO}}` literal rendered in `/legal/ptd`** (Ley 1581 Art. 13 requires company phone on PTD). Root cause: TELEFONO was missing from the remark plugin's SECRETS dict, AND the remark plugin is being lost during Astro 5's content-layer data serialization. Fix: (1) added TELEFONO to `src/lib/remark-substitute-legal-placeholders.ts` SECRETS dict, (2) switched the build command to `node scripts/build.js` which pre-substitutes tokens in legal markdown files before Astro's content layer caches them (then restores originals for DPO review).
+
+### Added — Brand kit (production-grade)
+- **`public/favicon.ico`** — multi-size ICO (16+32+48) for browsers
+- **`public/apple-touch-icon.png`** — 180x180 with full-bleed cream background (iOS bookmarks)
+- **`public/og-image.png`** — 1200x630 Open Graph preview for social share (logo + tagline + URL)
+- **`public/site.webmanifest`** — PWA manifest (name, icons, theme color)
+- **`public/robots.txt`** — SEO crawler rules (allow demo, disallow admin/api)
+- **`public/sitemap.xml`** — 7-URL sitemap (home, demo, 4 verticals, aviso)
+- **`public/logo/mark-512.png`** — mark only (icon), 512x512, transparent BG
+- **`public/logo/mark-192.png`** — PWA icon size
+- **`public/logo/mark-32.png`** — favicon-size
+- **`public/logo/horizontal-512x128.png`** — mark + "Opita Market" wordmark horizontal
+- **`public/logo/vertical-256x256.png`** — mark + wordmark stacked (replaces the old `/demo/logo/square.png` poster)
+- **`scripts/opita-assets/generate_logos.py`** — generator script (Pillow primitives, no SVG dependencies; uses brand DNA colors: terracotta `#a85a32`, coffee brown `#6b3a1c`, parchment cream `#f8f1e3`)
+
+### Changed
+- **DemoLayout.astro + BaseLayout.astro** — added `<link>` tags for favicon, apple-touch-icon, manifest, plus `<meta>` tags for og:image, twitter:card, theme-color
+- **DemoLayout.astro navbar + footer** — replaced `/demo/logo/square.png` (the old "poster" with tiny logo on huge cream background) with `/logo/mark-192.png` (real transparent-background mark)
+
+### Design language (brand consistency)
+- All assets use the same brand DNA from `scripts/opita-assets/design-system.md`:
+  - **Terracotta** `#a85a32` (Huila coffee, Andean earth) — awning stripes
+  - **Coffee brown** `#6b3a1c` (shadows, depth, wood) — "O" letterform, wordmark
+  - **Parchment cream** `#f8f1e3` (backgrounds, light surfaces) — circle interior
+  - **Andean green** `#3a8c4e` (secondary, foliage)
+  - **Deep night** `#2c2520` (type, contrast)
+- The "O with market-stall awning" motif is preserved across all sizes (32px favicon → 1200×630 OG image) — recognizable at any scale
+
+### Deployment
+- **Tag**: `v0.1.0-demo-4`
+- **Commit**: `30797aa`
+- **Staging URL**: https://staging.opita-market-dev.pages.dev/demo
+
+---
+
 ## [v0.1.0-demo-3] — 2026-06-28
 
 ### Changed
