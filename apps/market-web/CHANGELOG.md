@@ -11,6 +11,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [v0.1.0-demo-3] — 2026-06-28
+
+### Changed
+- **Reemplazo de jerga en inglés por español claro** en todo el demo (operador feedback: "los inversionistas son más a la antigua con lenguaje claro"). Cambios visibles al usuario:
+  - `Watch-time predictivo` → `Tiempo de visualización`
+  - `Nicho affinity` → `Gustos parecidos`
+  - `Creator affinity` → `Creadores que sigues`
+  - `Diversity` → `Variedad`
+  - `Recencia` → `Novedad`
+  - `Network effect` → `Efecto red`
+  - `Status quo` → `Lo de hoy`
+  - `UGC` → `Videos hechos por la gente`
+  - `TikTok-style` → (eliminado del copy visible)
+  - `creator economy` → `cómo ganan los creadores`
+  - `social commerce` (CTA) → `comercio por redes sociales`
+  - `PyMEs` (CTA) → `negocios`
+  - `thesis` (CTA) → `invertir en`
+  - ACT 9 title: `Creadores` → `Cómo ganan los que publican`
+  - ACT 10 title: `El flywheel` → `El círculo virtuoso`
+- Mantengo en inglés (proper nouns): TikTok, Temu, Nequi, Bre-B, Daviplata, LATAM, Habeas Data, NIT, DPO, RUES (términos legales colombianos).
+
+### Deployment
+- **Tag**: `v0.1.0-demo-3`
+- **Commit**: `8504c1b`
+- **Staging URL**: https://staging.opita-market-dev.pages.dev/demo
+
+---
+
 ## [v0.1.0-demo-2] — 2026-06-28
 
 ### Changed
