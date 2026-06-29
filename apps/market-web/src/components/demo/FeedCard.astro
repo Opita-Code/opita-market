@@ -25,7 +25,10 @@
  */
 
 interface Props {
+  /** Imagen poster (también fallback si no hay video). */
   videoSrc: string;
+  /** MP4 opcional — si está, se renderiza <video autoplay loop muted>. */
+  mp4Src?: string;
   creatorName: string;
   creatorAvatar?: string;
   creatorFollowers?: number;
@@ -47,6 +50,7 @@ interface Props {
 
 const {
   videoSrc,
+  mp4Src,
   creatorName,
   creatorAvatar,
   creatorFollowers,
@@ -89,14 +93,27 @@ const isLive = duration <= 0;
 <div class:list={["relative group", sizeClass, className]} data-reveal>
   {/* Video container (vertical 9:16 aspect) */}
   <div class="relative aspect-[9/16] rounded-2xl overflow-hidden bg-ink-900 shadow-xl ring-1 ring-ink-900/10">
-    {/* Cover image */}
-    <img
-      src={videoSrc}
-      alt={productName}
-      loading="lazy"
-      decoding="async"
-      class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-    />
+    {/* Cover (video si está disponible, si no imagen) */}
+    {mp4Src ? (
+      <video
+        src={mp4Src}
+        poster={videoSrc}
+        autoplay
+        loop
+        muted
+        playsinline
+        preload="metadata"
+        class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+      />
+    ) : (
+      <img
+        src={videoSrc}
+        alt={productName}
+        loading="lazy"
+        decoding="async"
+        class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+      />
+    )}
 
     {/* Top gradient (for play button + duration) */}
     <div class="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none"></div>
