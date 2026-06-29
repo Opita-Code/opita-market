@@ -11,6 +11,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [v0.1.0-demo-5] — 2026-06-28
+
+### Fixed
+- **Voseo (dialecto argentino) en subpáginas del demo.** Reemplazos:
+  - `/demo/foods`: "Pedí" → "Pide", "¿Qué buscás?" → "¿Qué buscas?", "¿Tenés/vendés?" → "¿Tienes/vendes?"
+  - `/demo/barber`: "¿Sos barbero y querés aparecer?" → "¿Eres barbero y quieres aparecer?", "Reservá/Pagá" → "Reserva/Paga"
+  - `/demo/beauty`: "¿Tenés un centro de belleza?" → "¿Tienes un centro de belleza?"
+  - `/demo/hogar`: "¿Sos profesional del hogar?" → "¿Eres profesional del hogar?"
+  - `/demo/lobby/[slug]`: "¿Sos el dueño?" → "¿Eres el dueño?"
+  - `/lib/demo-data.ts`: "Encontrá/Reservá/Compará/Pedí" → neutrales
+- **Typo "datéfono" → "datáfono"** (en español es "datáfono", no "datéfono"). Corregido en 5 lugares: `/pages/demo/index.astro` (testimonio), `/lib/algorithm.ts` (2x), `/lib/demo-algorithm.ts`, `/lib/demo-data.ts`, `/components/demo/Flywheel.astro`.
+
+### Changed
+- **Jerga yanqui removida**: `$5M pre-seed a16z` (en `/demo/beauty`) — referencia a VC Silicon Valley no comunica nada a inversionistas tradicionales. Mantenido el badge "Inspirado en Morado" (referencia local colombiana).
+- **Teléfono real +57 312 6126085** reemplaza el placeholder `+57 8 8700000 (staging)` en `wrangler.toml` y `src/lib/legal-secrets.generated.ts`. Cumple Ley 1581 Art. 13 con el número del DPO. Tipografía corregida en `.generated.ts` (tenía `;;` por error en un edit anterior).
+
+### Deployment
+- **Tag**: `v0.1.0-demo-5`
+- **Commit**: `d2b5d97`
+- **Staging URL**: https://staging.opita-market-dev.pages.dev/demo
+
+---
+
 ## [v0.1.0-demo-4] — 2026-06-28
 
 ### Fixed
