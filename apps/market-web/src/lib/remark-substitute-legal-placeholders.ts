@@ -29,6 +29,7 @@ import {
   PTD_DIRECCION,
   PTD_REP_LEGAL,
   PTD_EMAIL_PUBLICO,
+  PTD_TELEFONO,
   getDpoContactUrl,
 } from "./legal-secrets.generated";
 
@@ -38,6 +39,10 @@ const SECRETS: Record<string, string> = {
   DIRECCION: PTD_DIRECCION,
   REP_LEGAL: PTD_REP_LEGAL,
   EMAIL_PUBLICO: PTD_EMAIL_PUBLICO,
+  // PR 10 (closes OPL-COMP-001, HIGH): company phone — Ley 1581 Art. 13
+  // requires a real contact number on the PTD. Was missing from this dict
+  // so the rendered page showed literal "{{TELEFONO}}" — fixed in v0.1.0-demo-4.
+  TELEFONO: PTD_TELEFONO,
   // PR 3 — closes MW-FE-008: DPO_EMAIL no longer bundled.
   // Resolved at runtime via /api/legal/dpo-contact endpoint.
   DPO_EMAIL: getDpoContactUrl(),

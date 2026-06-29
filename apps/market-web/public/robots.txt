@@ -1,0 +1,9 @@
+# robots.txt — Opita Market
+User-agent: *
+Allow: /
+Allow: /demo
+Allow: /legal/aviso
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: https://market.opitacode.com/sitemap.xml
