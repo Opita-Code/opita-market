@@ -259,7 +259,7 @@ export const FACTOR_DESCRIPCIONES: Record<Factor, { nombre: string; detalle: str
   acepta_saldo: {
     nombre: "Acepta Opita Saldo",
     detalle:
-      "Cerrado-loop wallet, sin tarjeta, sin datéfono. 100 si acepta, 40 si solo métodos tradicionales. Diferenciador clave.",
+      "Wallet cerrada, sin tarjeta, sin datáfono. 100 si acepta, 40 si solo métodos tradicionales. Diferenciador clave.",
   },
   recencia: {
     nombre: "Precios actualizados",

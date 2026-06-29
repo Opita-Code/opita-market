@@ -176,7 +176,7 @@ function aceptaSaldoScore(negocio: DemoNegocio, prefiereSaldo?: boolean): { scor
   if (negocio.acepta_saldo) {
     return {
       score: prefiereSaldo ? 100 : 100,
-      explicacion: "Acepta Opita Saldo — sin tarjeta, sin datéfono, pago instantáneo",
+      explicacion: "Acepta Opita Saldo — sin tarjeta, sin datáfono, pago instantáneo",
       explicacion_corta: "💰 Saldo",
     };
   }
@@ -401,7 +401,7 @@ export const FACTOR_DETALLES: Record<Factor, { nombre: string; peso_pct: number;
   acepta_saldo: {
     nombre: "Acepta Opita Saldo",
     peso_pct: 15,
-    proposito: "Diferenciador clave. Cerrado-loop wallet sin tarjeta, sin datéfono. Reduce fricción y abre el mercado a personas no bancarizadas.",
+    proposito: "Diferenciador clave. Wallet cerrada sin tarjeta, sin datáfono. Reduce fricción y abre el mercado a personas no bancarizadas.",
     ejemplos: [
       "Una peluquería que acepta Saldo rankea más alto para usuarios que también lo aceptan",
       "Un restaurante que solo recibe efectivo pierde 60 puntos vs uno con Saldo",

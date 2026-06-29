@@ -32,7 +32,7 @@ export const VERTICALES: Record<VerticalSlug, Vertical> = {
     nombre: "Opita Foods",
     subtitulo: "Restaurantes + supply B2B como Frubana",
     descripcion:
-      "Pedí a restaurantes del Huila por WhatsApp o compará precios mayoristas de productos frescos para tu negocio. Sin datéfono, sin tarjeta.",
+      "Pide a restaurantes del Huila por WhatsApp o compara precios mayoristas de productos frescos para tu negocio. Sin datáfono, sin tarjeta.",
     emoji: "🍲",
     colorAccent: "brand",
     categorias: ["Restaurantes", "Cafés", "Panaderías", "Frutas y verduras", "Cárnicos"],
@@ -44,7 +44,7 @@ export const VERTICALES: Record<VerticalSlug, Vertical> = {
     nombre: "Opita Barber",
     subtitulo: "Barberías del Huila, cerca de ti",
     descripcion:
-      "Encontrá la barbería más cercana con servicios claros y precios publicados. Reservá por WhatsApp sin complicarte.",
+      "Encuentra la barbería más cercana con servicios claros y precios publicados. Reserva por WhatsApp sin complicarte.",
     emoji: "💈",
     colorAccent: "sky",
     categorias: ["Barberías", "Corte caballero", "Barba", "Tintes"],

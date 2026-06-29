@@ -18,5 +18,5 @@ export const PTD_DIRECCION = "Neiva, Huila, Colombia";
 export const PTD_REP_LEGAL = "Representante Legal de Opita Code";
 export const PTD_EMAIL_PUBLICO = "Owner@opitacode.com";
 export const PTD_DPO_EMAIL = "nicourrutia83@gmail.com";
-export const PTD_TELEFONO = "+57 8 8700000 (staging)";
-export const PUBLIC_PTD_TELEFONO = "+57 8 8700000 (staging)";
+export const PTD_TELEFONO = "+57 312 6126085";
+export const PUBLIC_PTD_TELEFONO = "+57 312 6126085";
