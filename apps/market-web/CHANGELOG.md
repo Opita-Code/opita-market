@@ -6,8 +6,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Pending
-- Replace static PNG covers with UGC `<video>` clips once MiniMax video quota resets
-- Add `<video autoplay loop muted playsinline poster>` support to FeedCard when videos arrive
+- Regenerate `hogar.mp4` once MiniMax Token Plan daily quota resets (~23h)
+
+---
+
+## [v0.1.0-demo-6] — 2026-06-28
+
+### Added — UGC video covers in FeedShowcase
+- **3 de 4 videos UGC** generados vía maria-trabajos `/api/director/render` pipeline (MiniMax-Hailuo-2.3-Fast I2V, 6s @ 768P, 9:16):
+  - `/demo/feed/foods.mp4` (1.1 MB) — María placing steaming plate of lechona
+  - `/demo/feed/barber.mp4` (763 KB) — Don Hernán clippers trimming fade
+  - `/demo/feed/beauty.mp4` (680 KB) — Manicurista applying gel polish
+  - `/demo/feed/hogar.mp4` PENDIENTE — Token Plan quota agotada en 3/3 daily (reset en ~23h). El item hogar (Plomería Rivera) mantiene el poster keyframe 9:16 mientras tanto.
+- **`FeedCard.astro`** ahora soporta `mp4Src?: string` opcional:
+  - Con mp4Src: `<video src=mp4Src poster=videoSrc autoplay loop muted playsinline preload=metadata>`
+  - Sin mp4Src: `<img src=videoSrc>` (fallback automático para hogar)
+  - El poster (imagen) se muestra mientras el video carga o si autoplay está bloqueado por el navegador
+- **`FeedShowcase.astro`**: 5 de 6 items tienen `mp4Src`. Los videos sirven con `Content-Type: video/mp4` en staging.
+
+### Changed
+- 3 de 4 verticales en FeedShowcase ahora muestran **video corto animado** en lugar de una imagen estática. El visitante siente que está viendo contenido real (no un poster corporativo).
+
+### Deployment
+- **Tag**: `v0.1.0-demo-6`
+- **Commit**: `c5c735c`
+- **Staging URL**: https://staging.opita-market-dev.pages.dev/demo
 
 ---
 
