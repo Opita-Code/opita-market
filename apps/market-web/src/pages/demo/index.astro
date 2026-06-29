@@ -69,10 +69,10 @@ const comparisonRows = [
   { feature: "Foco en SMBs colombianos", opita: "✓", temu: "—", tiktok: "—", mercadolibre: "Parcial", paginasamarillas: "✓" },
   { feature: "Verificación NIT (RUES) por defecto", opita: "✓", temu: "—", tiktok: "—", mercadolibre: "—", paginasamarillas: "Parcial" },
   { feature: "Pagos sin tarjeta (Opita Saldo)", opita: "✓", temu: "—", tiktok: "—", mercadolibre: "—", paginasamarillas: "—" },
-  { feature: "Contenido UGC en video (TikTok-style)", opita: "✓", temu: "—", tiktok: "✓", mercadolibre: "—", paginasamarillas: "—" },
-  { feature: "Algoritmo transparente y explicable", opita: "✓", temu: "—", tiktok: "—", mercadolibre: "—", paginasamarillas: "—" },
-  { feature: "Comisión por venta", opita: "0%", temu: "5-8%", tiktok: "5-8%", mercadolibre: "13-16%", paginasamarillas: "—" },
-  { feature: "Creator economy para SMBs locales", opita: "✓", temu: "—", tiktok: "✓", mercadolibre: "—", paginasamarillas: "—" },
+{ feature: "Videos hechos por la gente real", opita: "✓", temu: "—", tiktok: "✓", mercadolibre: "—", paginasamarillas: "—" },
+          { feature: "Algoritmo transparente y explicable", opita: "✓", temu: "—", tiktok: "—", mercadolibre: "—", paginasamarillas: "—" },
+          { feature: "Comisión por venta", opita: "0%", temu: "—", tiktok: "13-16%", mercadolibre: "13-16%", paginasamarillas: "—" },
+          { feature: "Ganancias para creadores locales", opita: "✓", temu: "—", tiktok: "✓", mercadolibre: "—", paginasamarillas: "—" },
   { feature: "Cumplimiento Ley 1581 Habeas Data", opita: "✓", temu: "—", tiktok: "Parcial", mercadolibre: "Parcial", paginasamarillas: "Parcial" },
   { feature: "Auditoría externa completada", opita: "✓", temu: "Parcial", tiktok: "—", mercadolibre: "Parcial", paginasamarillas: "—" },
 ];
@@ -82,7 +82,7 @@ const roadmap: RoadmapItem[] = [
   { date: "Q1 2026", title: "Compliance foundation", description: "Habeas Data Ley 1581/2012, RNBD, DPO, Suprimir mi negocio. Auditoría externa 87 hallazgos cerrados (90/100).", status: "done", tag: "Shipped" },
   { date: "Q2 2026", title: "Pagos + Opita Saldo + Lobby", description: "Opita Pagos multi-carril (Wompi, Bre-B, Nequi, Daviplata), Opita Saldo cerrado, lobby personalizable por negocio.", status: "done", tag: "Shipped" },
   { date: "Jun 2026", title: "Investor demo + staging", description: "Esta página. Pentest Round 2 cerrado (89/101), staging en demo.market.opitacode.com.", status: "current", tag: "Live now" },
-  { date: "Q3 2026", title: "Feed social + creators (TikTok-style)", description: "Lanzamiento del feed de videos UGC con algoritmo de personalización + onboarding de 100 creadores en el Huila.", status: "upcoming", tag: "Q3 · Clave" },
+  { date: "Q3 2026", title: "Carrusel de videos y creadores", description: "Lanzamiento del carrusel con videos hechos por la gente + algoritmo que te muestra lo que te interesa + onboarding de 100 creadores en el Huila.", status: "upcoming", tag: "Q3 · Clave" },
   { date: "Q4 2026", title: "Producción Huila + Eje cafetero", description: "Onboarding masivo de comerciantes, partnerships con alcaldías del Huila, expansión a Pereira/Manizales/Armenia.", status: "upcoming", tag: "Q4" },
   { date: "Q1 2027", title: "Bogotá + Medellín + 5 verticales nuevos", description: "Capital + Antioquia. Expansión a verticales adicionales (autos, agro, salud). Meta: 50K negocios verificados.", status: "upcoming", tag: "Q1 2027" },
   { date: "Q3 2027", title: "Colombia completa + LatAm", description: "Cali, Barranquilla, Cartagena. Piloto Ecuador y Perú. Series A.", status: "upcoming", tag: "Mid 2027" },
@@ -153,7 +153,7 @@ const trustedByItems: TrustedByItem[] = [
           </h1>
 
           <p class="text-xl sm:text-2xl text-ink-700 leading-relaxed max-w-2xl animate-fade-up delay-200 text-pretty">
-            Marketplace + feed de videos UGC + creator economy + pagos sin tarjeta. <strong>Un solo producto</strong> para 2.5 millones de PyMEs que hoy son invisibles para sus propios clientes.
+            Marketplace + carrusel de videos hechos por la gente + cómo ganan los creadores + pagos sin tarjeta. <strong>Un solo producto</strong> para 2.5 millones de negocios que hoy son invisibles para sus propios clientes.
           </p>
 
           <div class="flex flex-col sm:flex-row gap-3 animate-fade-up delay-300">
@@ -294,7 +294,7 @@ const trustedByItems: TrustedByItem[] = [
   </section>
 
   {/* ============================================================== */}
-  {/* ACT 5: EL FEED — TikTok-style product video feed (NEW)            */}
+  {/* ACT 5: EL FEED — Carrusel de videos hechos por la gente (NEW)            */}
   {/* ============================================================== */}
   <div id="feed"></div>
   <FeedShowcase />
@@ -406,13 +406,13 @@ const trustedByItems: TrustedByItem[] = [
   <AlgorithmDeepDive />
 
   {/* ============================================================== */}
-  {/* ACT 9: CREADORES — creator economy (NEW)                          */}
+  {/* ACT 9: CREADORES — cómo ganan los que publican (NEW)                          */}
   {/* ============================================================== */}
   <ChapterMarker number="06" title="Creadores" subtitle="Cualquier persona con celular y carisma puede monetizar mostrando los negocios del Huila." tone="warm" />
   <CreatorEconomy />
 
   {/* ============================================================== */}
-  {/* ACT 10: EL FLYWHEEL — B2C × B2B connection (NEW)                  */}
+  {/* ACT 10: EL CÍRCULO VIRTUOSO — B2C × B2B connection (NEW)                  */}
   {/* ============================================================== */}
   <ChapterMarker number="07" title="El flywheel" subtitle="El círculo virtuoso: cada consumidor atrae negocios, cada negocio atrae consumidores. La red se refuerza sola." tone="dark" />
   <Flywheel />
@@ -602,10 +602,10 @@ const trustedByItems: TrustedByItem[] = [
       <div class="text-center max-w-3xl mx-auto">
         <Badge variant="brand">Inversión Serie Seed · Q3 2026</Badge>
         <h2 class="text-4xl sm:text-5xl lg:text-6xl font-black mt-5 mb-6 tracking-tight text-balance">
-          Estamos construyendo el <span class="text-gradient-warm">social commerce</span> de 2.5 millones de PyMEs colombianas.
+          Estamos construyendo el <span class="text-gradient-warm">comercio por redes sociales</span> de 2.5 millones de negocios colombianos.
         </h2>
         <p class="text-lg sm:text-xl text-ink-700 leading-relaxed mb-10 text-pretty">
-          Si eres inversor o founder con thesis en marketplaces verticales, social commerce, creator economy o inclusión financiera en LATAM, hablemos.
+          Si eres inversionista y te interesa invertir en marketplaces para pueblos, comercio por redes sociales o inclusión financiera en Colombia y la región, hablemos.
         </p>
         <div class="flex flex-col sm:flex-row gap-3 justify-center">
           <Button href="mailto:investors@opita.market" variant="primary" size="lg">
